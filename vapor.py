@@ -182,7 +182,7 @@ def vapor(query, bot, request_id, chat_id):
     logger.info("[{}] Current cache size: {}".format(str(request_id), str(cache_size)))
     if (cache_size > 500):
         logger.info("Warning admin about cache size.")
-        bot.send_message(chat_id=LIST_OF_ADMINS[0], text="Cache is over 500MB! Bot needs restart.")
+        bot.send_message(chat_id=LIST_OF_ADMINS[0], text=emoji_cd + " Cache is over 500MB! Bot needs restart.")
 
     # cleanup
     logger.info("[{}] Cleanup temporary files.".format(str(request_id), ))
@@ -195,6 +195,13 @@ def vapor(query, bot, request_id, chat_id):
 
 
 # bot handlers
+@restricted
+def test_command(bot, update):
+    """ Test if bot is alive (returns True for CI) """
+    bot.send_message(chat_id=LIST_OF_ADMINS[0], text=emoji_palm_tree + " Virtual Dreams is ONLINE.")
+    return True
+
+
 @run_async
 def help_command(bot, update):
     bot.send_message(chat_id=update.message.chat_id, text=emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\"\n" + emoji_video_camera + " /vapor YouTube URL.")
@@ -256,6 +263,7 @@ def main():
     help_handler = CommandHandler('help', help_command)
     start_handler = CommandHandler('start', help_command)
     vapor_handler = CommandHandler('vapor', vapor_command)
+    test_handler = CommandHandler('test', test_command)
     restart_handler = CommandHandler('restart', restart)
     unknown_handler = MessageHandler(Filters.command, unknown_command)
 
@@ -263,6 +271,7 @@ def main():
     dispatcher.add_handler(start_handler)
     dispatcher.add_handler(help_handler)
     dispatcher.add_handler(vapor_handler)
+    dispatcher.add_handler(test_handler)
     dispatcher.add_handler(restart_handler)
     dispatcher.add_handler(unknown_handler)
 
