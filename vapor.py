@@ -2,7 +2,7 @@
 
 """vapor.py: Virtual Dreams Bot for Telegram. Generates Vaporwave music."""
 
-__author__      = "Felipe S. Custódio"
+__author__  = "Felipe S. Custódio"
 __license__ = "GPL"
 __credits__ = ["WJLiddy", "vivjay"]
 
@@ -50,6 +50,7 @@ emoji_palm_tree = emojize(":palm_tree:", use_aliases=True)
 emoji_video_camera = emojize(":video_camera:", use_aliases=True)
 emoji_cd = emojize(":cd:", use_aliases=True)
 
+# restrict commands to admin
 # @felup.io (bot admin)
 LIST_OF_ADMINS = [71491472]
 
@@ -236,10 +237,18 @@ def unknown_command(bot, update):
     bot.send_message(chat_id=update.message.chat_id, text=emoji_cd + " ＥＲＲＯＲ.\nThis is not a valid command. Use /help to find out more.")
 
 
+@run_async
+def error_handler(bot, update, error):
+    logger.warning('Update "%s" caused error "%s"', update, error)
+
+
 def main():
-    # bot initialize
+    # set env variables
     load_dotenv()
     BOT_TOKEN = os.getenv("TOKEN")
+    HEROKU_NAME = "virtualdreamsbot"
+    PORT = os.environ.get('PORT')
+
     updater = Updater(token=BOT_TOKEN)
     dispatcher = updater.dispatcher
 
@@ -274,6 +283,7 @@ def main():
     dispatcher.add_handler(test_handler)
     dispatcher.add_handler(restart_handler)
     dispatcher.add_handler(unknown_handler)
+    dispatcher.add_error_handler(error_handler)
 
     # move working directory to cache
     if not os.path.exists("cache") and not (str(os.path.basename(os.getcwd())) == "cache"):
@@ -285,10 +295,14 @@ def main():
     else:
         os.chdir("cache")
 
-    updater.start_polling()
-    print("[BOT] Bot ready. Directory: {}".format(str(os.getcwd())))
+    # Start the webhook
+    updater.start_webhook(listen="0.0.0.0",
+                          port=int(PORT),
+                          url_path=BOT_TOKEN)
+    updater.bot.setWebhook("https://{}.herokuapp.com/{}".format(HEROKU_NAME, BOT_TOKEN))
+    logger.info("Bot ready. Directory: {}".format(str(os.getcwd())))
     updater.idle()
-    
+
 
 if __name__ == '__main__':
     main()

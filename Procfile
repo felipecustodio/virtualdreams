@@ -1,1 +1,1 @@
-worker: python vapor.py
+web: python vapor.py
