@@ -15,3 +15,7 @@ python_telegram_bot == 11.1.0
 
 # vapor.py: 26
 youtube_dl == 2018.9.26
+
+# soundfile
+soundfile
+
