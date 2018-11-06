@@ -178,13 +178,6 @@ def vapor(query, bot, request_id, chat_id):
     vapor_path = title + "_vapor.wav"
     bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
 
-    # check if cache size is big and warn admin
-    cache_size = sum(os.path.getsize(f) for f in os.listdir('.') if os.path.isfile(f)) * 0.000001
-    logger.info("[{}] Current cache size: {}".format(str(request_id), str(cache_size)))
-    if (cache_size > 500):
-        logger.info("Warning admin about cache size.")
-        bot.send_message(chat_id=LIST_OF_ADMINS[0], text=emoji_cd + " Cache is over 500MB! Bot needs restart.")
-
     # cleanup
     logger.info("[{}] Cleanup temporary files.".format(str(request_id), ))
     try:
@@ -193,6 +186,13 @@ def vapor(query, bot, request_id, chat_id):
         os.remove(slow_path)
     except OSError:
         pass
+
+    # check if cache size is big and warn admin
+    cache_size = sum(os.path.getsize(f) for f in os.listdir('.') if os.path.isfile(f)) * 0.000001
+    logger.info("[{}] Current cache size: {}".format(str(request_id), str(cache_size)))
+    if (cache_size > 500):
+        logger.info("Warning admin about cache size.")
+        bot.send_message(chat_id=LIST_OF_ADMINS[0], text=emoji_cd + " Cache is over 500MB! Bot needs restart.")
 
 
 # bot handlers
@@ -247,7 +247,7 @@ def main():
     load_dotenv()
     BOT_TOKEN = os.getenv("TOKEN")
     HEROKU_NAME = "virtualdreamsbot"
-    PORT = os.environ.get('PORT')
+    PORT = int(os.environ.get('PORT', '8443'))
 
     updater = Updater(token=BOT_TOKEN)
     dispatcher = updater.dispatcher
@@ -295,11 +295,12 @@ def main():
     else:
         os.chdir("cache")
 
-    # Start the webhook
+    # webhook
     updater.start_webhook(listen="0.0.0.0",
-                          port=int(PORT),
+                          port=PORT,
                           url_path=BOT_TOKEN)
     updater.bot.setWebhook("https://{}.herokuapp.com/{}".format(HEROKU_NAME, BOT_TOKEN))
+
     logger.info("Bot ready. Directory: {}".format(str(os.getcwd())))
     updater.idle()
 

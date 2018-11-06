@@ -1,2 +1,2 @@
 source "https://rubygems.org"
-gem "sndfile-ruby", :require => "sndfile"
+gem 'sndfile', '~> 1.1'
