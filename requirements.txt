@@ -3,6 +3,8 @@ python-dotenv
 python-telegram-bot
 emoji
 pysndfx
+pydub
+soundfile
 pychorus
 youtube_dl
 soundfile
