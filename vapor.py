@@ -18,6 +18,9 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from telegram.ext.dispatcher import run_async
 from telegram import InlineQueryResultArticle, InputTextMessageContent, ChatAction
 from emoji import emojize
+# audio manipulation
+from pysndfx import AudioEffectsChain
+from pydub import AudioSegment
 # youtube search
 import urllib.request
 import urllib.parse
@@ -50,9 +53,25 @@ emoji_palm_tree = emojize(":palm_tree:", use_aliases=True)
 emoji_video_camera = emojize(":video_camera:", use_aliases=True)
 emoji_cd = emojize(":cd:", use_aliases=True)
 
+# vaporwave parameters
+fx = (
+        AudioEffectsChain()
+        .speed(0.63)
+        .reverb(
+               reverberance=100,
+               hf_damping=50,
+               room_scale=100,
+               stereo_depth=100,
+               pre_delay=20,
+               wet_gain=0,
+               wet_only=False
+               )
+    )
+
 # restrict commands to admin
 # @felup.io (bot admin)
 LIST_OF_ADMINS = [71491472]
+
 
 def restricted(func):
     @wraps(func)
@@ -63,17 +82,6 @@ def restricted(func):
             return
         return func(bot, update, *args, **kwargs)
     return wrapped
-
-# typing function decorator
-def send_upload_action(func):
-    """Sends typing action while processing func command."""
-
-    @wraps(func)
-    def command_func(*args, **kwargs):
-        bot, update = args
-        bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.UPLOAD_AUDIO)
-        func(bot, update, **kwargs)
-    return command_func
 
 
 def vapor(query, bot, request_id, chat_id):
@@ -88,35 +96,42 @@ def vapor(query, bot, request_id, chat_id):
 
     Query can be YouTube link. 
     """
-    logger.info("[{}] Working on request.".format(str(request_id)))
+    logger.info("[{}] Working on request...".format(str(request_id)))
 
     # check if query is youtube url
-    logger.info("[{}] Searching for query.".format(str(request_id)))
+    logger.info("[{}] Searching for query on YouTube...".format(str(request_id)))
+    
     if not query.lower().startswith((youtube_urls)):
         # search for youtube videos matching query
         query_string = urllib.parse.urlencode({"search_query" : query})
         html_content = urllib.request.urlopen("http://www.youtube.com/results?" + query_string)
         search_results = re.findall(r'href=\"\/watch\?v=(.{11})', html_content.read().decode())
+        info = False
+
         # find video that fits max duration
         for url in search_results:
             # check for video duration
             info = youtube_dl.YoutubeDL().extract_info(url,download = False)
             full_title = info['title']
-            if (info['duration'] < MAX_DURATION):
+            if (info['duration'] < MAX_DURATION and info['duration'] >= 5):
                 # get first video that fits the limit duration
                 break
-            else:
-                url = False                
+        
         # if we ran out of urls, return error
-        if (not url):
-            raise ValueError('Could not find video that fits the maximum duration for ' + str(full_title) + '.')
+        if (not info):
+            raise ValueError('Could not find video.')
+
     # query was a youtube link
     else:
         url = query    
         info = youtube_dl.YoutubeDL().extract_info(url,download = False)
+        # check if video fits limit duration
+        if (info['duration'] < 5 or info['duration'] > MAX_DURATION):
+            raise ValueError('Video too short!')
 
-    title = (re.sub(r'\W+', '', info['title']))[:15]  # cleanup title
-    title = str((title.encode('ascii',errors='ignore')).decode())  # remove non-ascii characters
+    # cleanup title
+    title = (re.sub(r'\W+', '', info['title']))[:15]
+    title = str((title.encode('ascii',errors='ignore')).decode())
 
     # check if cached audio exists
     vapor_path = Path(title + "_vapor.wav")
@@ -127,51 +142,57 @@ def vapor(query, bot, request_id, chat_id):
         return 
 
     # download video and extract mp3 audio
-    logger.info("[{}] Downloading video and converting to mp3.".format(str(request_id)))
+    logger.info("[{}] Downloading audio...".format(str(request_id)))
     ydl_opts = {
         'quiet': 'True',
         'format': 'bestaudio/best',
         'outtmpl': str(request_id) +'.%(ext)s',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
+            'preferredcodec': 'wav',
             'preferredquality': '192',
         }],
     }
 
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+        try:
+            ydl.download([url])
+        except:
+            raise ValueError('Could not download ' + str(full_title) + '.')
 
     # prepare audio files paths
-    audio_filename = str(request_id) + ".mp3"
+    original_path = str(request_id) + ".wav"
     chorus_path = str(request_id) + "_chorus.wav"
-    slow_path = str(request_id) + "_slow.wav"
     vapor_path = title + "_vapor.wav"
 
     # find and extract music chorus
-    logger.info("[{}] Searching for song chorus.".format(str(request_id)))
+    logger.info("[{}] Searching for song chorus...".format(str(request_id)))
     chorus = False
     chorus_duration = 15
     while (not chorus and chorus_duration > 0):
-        chorus = find_and_output_chorus(audio_filename, chorus_path, 15)
+        chorus = find_and_output_chorus(original_path, chorus_path, 15)
         chorus_duration -= 5
     
     if (not chorus):
-        try:
-            os.remove(audio_filename)
-            os.remove(chorus_path)
-            os.remove(slow_path)
-        except OSError:
-            pass
-        raise ValueError('Could not find chorus of ' + str(full_title) + '.')
+        # doesnt have chorus, use first seconds as chorus
+        logger.info("[{}] Chorus not found. Trying initial seconds...".format(str(request_id)))
+        chorus_duration = 15 # reset durations
+        song = AudioSegment.from_wav(original_path)
+        
+        # get the smallest possible segment
+        # video is already guaranteed to be equal or greater than 5 seconds
+        while (chorus_duration > info['duration']):
+            chorus_duration -= 5
 
-    # slow down music
+        seconds = chorus_duration * 1000
+        first_seconds = song[:seconds]
+        first_seconds.export(chorus_path, format="wav")
+
+    # make it vaporwave (python wrapper for sox)
     logger.info("[{}] Applying Vaporwave FX.".format(str(request_id)))
-    cmd = "sox −V0 -v 0.99 " + chorus_path + " " + slow_path + " speed " + str(0.63)
-    os.system(cmd)
-    # vapor music
-    cmd = "sox −V0 -v 0.99 " + slow_path + " " + vapor_path + " reverb 100"
-    os.system(cmd)
+    infile = chorus_path
+    outfile = vapor_path
+    fx(infile, outfile)
 
     # send audio to user
     logger.info("[{}] Sending audio.".format(str(request_id), ))
@@ -181,36 +202,32 @@ def vapor(query, bot, request_id, chat_id):
     # cleanup
     logger.info("[{}] Cleanup temporary files.".format(str(request_id), ))
     try:
-        os.remove(audio_filename)
+        os.remove(original_path)
         os.remove(chorus_path)
-        os.remove(slow_path)
     except OSError:
         pass
 
-    # check if cache size is big and warn admin
+    # check cache size
     cache_size = sum(os.path.getsize(f) for f in os.listdir('.') if os.path.isfile(f)) * 0.000001
     logger.info("[{}] Current cache size: {}".format(str(request_id), str(cache_size)))
     if (cache_size > 500):
-        logger.info("Warning admin about cache size.")
-        bot.send_message(chat_id=LIST_OF_ADMINS[0], text=emoji_cd + " Cache is over 500MB! Bot needs restart.")
+        logger.info("Cache size above limit. Cleaning up...")
+        for filename in os.listdir():
+            if filename.endswith(('.mp3', '.wav')):
+                os.remove(filename)
+        os.chdir("..")
 
 
 # bot handlers
-@restricted
-def test_command(bot, update):
-    """ Test if bot is alive (returns True for CI) """
-    bot.send_message(chat_id=LIST_OF_ADMINS[0], text=emoji_palm_tree + " Virtual Dreams is ONLINE.")
-    return True
-
-
 @run_async
 def help_command(bot, update):
-    bot.send_message(chat_id=update.message.chat_id, text=emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\"\n" + emoji_video_camera + " /vapor YouTube URL.")
+    """ /help - Shows usage """
+    bot.send_message(chat_id=update.message.chat_id, text=emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\"\n" + emoji_video_camera + " /vapor YouTube URL.\n\nWorks with videos between 5 seconds and 10 minutes.")
 
 
 @run_async
-@send_upload_action
 def vapor_command(bot, update):
+    """ /vapor - Request handler """
     request_id = update.message.message_id
     chat_id = update.message.chat_id
     logger.info("[{}] {} has requested{}".format(str(request_id), str(update.message.from_user.username), update.message.text.replace('/vapor','')))
@@ -243,6 +260,7 @@ def error_handler(bot, update, error):
 
 
 def main():
+    logger.info("Initializing...")
     # set env variables
     load_dotenv()
     BOT_TOKEN = os.getenv("TOKEN")
@@ -252,36 +270,16 @@ def main():
     updater = Updater(token=BOT_TOKEN)
     dispatcher = updater.dispatcher
 
-    def stop_and_restart():
-        """ Clear cache """
-        for filename in os.listdir():
-            if filename.endswith(('.mp3', '.wav')):
-                os.remove(filename)
-        os.chdir("..")
-        
-        """Gracefully stop the Updater and replace the current process with a new one"""
-        updater.stop()
-        os.execl(sys.executable, sys.executable, *sys.argv)
-
-    @restricted
-    def restart(bot, update):
-        update.message.reply_text('Bot is restarting...')
-        Thread(target=stop_and_restart).start()
-
     # define bot handlers
     help_handler = CommandHandler('help', help_command)
     start_handler = CommandHandler('start', help_command)
     vapor_handler = CommandHandler('vapor', vapor_command)
-    test_handler = CommandHandler('test', test_command)
-    restart_handler = CommandHandler('restart', restart)
     unknown_handler = MessageHandler(Filters.command, unknown_command)
 
     # start bot handlers
     dispatcher.add_handler(start_handler)
     dispatcher.add_handler(help_handler)
     dispatcher.add_handler(vapor_handler)
-    dispatcher.add_handler(test_handler)
-    dispatcher.add_handler(restart_handler)
     dispatcher.add_handler(unknown_handler)
     dispatcher.add_error_handler(error_handler)
 
@@ -300,8 +298,8 @@ def main():
                           port=PORT,
                           url_path=BOT_TOKEN)
     updater.bot.setWebhook("https://{}.herokuapp.com/{}".format(HEROKU_NAME, BOT_TOKEN))
-
-    logger.info("Bot ready. Directory: {}".format(str(os.getcwd())))
+    logger.info("Bot ready.")
+    # updater.start_polling()
     updater.idle()
 
 
