@@ -20,6 +20,7 @@ from telegram import InlineQueryResultArticle, InputTextMessageContent, ChatActi
 from emoji import emojize
 # audio manipulation
 from pysndfx import AudioEffectsChain
+from pydub import AudioSegment
 # youtube search
 import urllib.request
 import urllib.parse
@@ -57,7 +58,7 @@ fx = (
         AudioEffectsChain()
         .speed(0.63)
         .reverb(
-               reverberance=50,
+               reverberance=100,
                hf_damping=50,
                room_scale=100,
                stereo_depth=100,
@@ -95,35 +96,42 @@ def vapor(query, bot, request_id, chat_id):
 
     Query can be YouTube link. 
     """
-    logger.info("[{}] Working on request.".format(str(request_id)))
+    logger.info("[{}] Working on request...".format(str(request_id)))
 
     # check if query is youtube url
-    logger.info("[{}] Searching for query.".format(str(request_id)))
+    logger.info("[{}] Searching for query on YouTube...".format(str(request_id)))
+    
     if not query.lower().startswith((youtube_urls)):
         # search for youtube videos matching query
         query_string = urllib.parse.urlencode({"search_query" : query})
         html_content = urllib.request.urlopen("http://www.youtube.com/results?" + query_string)
         search_results = re.findall(r'href=\"\/watch\?v=(.{11})', html_content.read().decode())
+        info = False
+
         # find video that fits max duration
         for url in search_results:
             # check for video duration
             info = youtube_dl.YoutubeDL().extract_info(url,download = False)
             full_title = info['title']
-            if (info['duration'] < MAX_DURATION):
+            if (info['duration'] < MAX_DURATION and info['duration'] >= 5):
                 # get first video that fits the limit duration
                 break
-            else:
-                url = False                
+        
         # if we ran out of urls, return error
-        if (not url):
-            raise ValueError('Could not find video that fits the maximum duration for ' + str(full_title) + '.')
+        if (not info):
+            raise ValueError('Could not find video.')
+
     # query was a youtube link
     else:
         url = query    
         info = youtube_dl.YoutubeDL().extract_info(url,download = False)
+        # check if video fits limit duration
+        if (info['duration'] < 5 or info['duration'] > MAX_DURATION):
+            raise ValueError('Video too short!')
 
-    title = (re.sub(r'\W+', '', info['title']))[:15]  # cleanup title
-    title = str((title.encode('ascii',errors='ignore')).decode())  # remove non-ascii characters
+    # cleanup title
+    title = (re.sub(r'\W+', '', info['title']))[:15]
+    title = str((title.encode('ascii',errors='ignore')).decode())
 
     # check if cached audio exists
     vapor_path = Path(title + "_vapor.wav")
@@ -134,53 +142,54 @@ def vapor(query, bot, request_id, chat_id):
         return 
 
     # download video and extract mp3 audio
-    logger.info("[{}] Downloading video and converting to mp3.".format(str(request_id)))
+    logger.info("[{}] Downloading audio...".format(str(request_id)))
     ydl_opts = {
         'quiet': 'True',
         'format': 'bestaudio/best',
         'outtmpl': str(request_id) +'.%(ext)s',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
+            'preferredcodec': 'wav',
             'preferredquality': '192',
         }],
     }
 
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+        try:
+            ydl.download([url])
+        except:
+            raise ValueError('Could not download ' + str(full_title) + '.')
 
     # prepare audio files paths
-    audio_filename = str(request_id) + ".mp3"
+    original_path = str(request_id) + ".wav"
     chorus_path = str(request_id) + "_chorus.wav"
-    slow_path = str(request_id) + "_slow.wav"
     vapor_path = title + "_vapor.wav"
 
     # find and extract music chorus
-    logger.info("[{}] Searching for song chorus.".format(str(request_id)))
+    logger.info("[{}] Searching for song chorus...".format(str(request_id)))
     chorus = False
     chorus_duration = 15
     while (not chorus and chorus_duration > 0):
-        chorus = find_and_output_chorus(audio_filename, chorus_path, 15)
+        chorus = find_and_output_chorus(original_path, chorus_path, 15)
         chorus_duration -= 5
     
     if (not chorus):
-        try:
-            os.remove(audio_filename)
-            os.remove(chorus_path)
-            os.remove(slow_path)
-        except OSError:
-            pass
-        raise ValueError('Could not find chorus of ' + str(full_title) + '.')
+        # doesnt have chorus, use first seconds as chorus
+        logger.info("[{}] Chorus not found. Trying initial seconds...".format(str(request_id)))
+        chorus_duration = 15 # reset durations
+        song = AudioSegment.from_wav(original_path)
+        
+        # get the smallest possible segment
+        # video is already guaranteed to be equal or greater than 5 seconds
+        while (chorus_duration > info['duration']):
+            chorus_duration -= 5
 
-    # make it vaporwave
-    # cmd = "sox −V0 -v 0.99 " + chorus_path + " " + slow_path + " speed " + str(0.63)
-    # os.system(cmd)
-    # # vapor music
-    # cmd = "sox −V0 -v 0.99 " + slow_path + " " + vapor_path + " reverb 100"
-    # os.system(cmd)
+        seconds = chorus_duration * 1000
+        first_seconds = song[:seconds]
+        first_seconds.export(chorus_path, format="wav")
 
+    # make it vaporwave (python wrapper for sox)
     logger.info("[{}] Applying Vaporwave FX.".format(str(request_id)))
-    
     infile = chorus_path
     outfile = vapor_path
     fx(infile, outfile)
@@ -193,9 +202,8 @@ def vapor(query, bot, request_id, chat_id):
     # cleanup
     logger.info("[{}] Cleanup temporary files.".format(str(request_id), ))
     try:
-        os.remove(audio_filename)
+        os.remove(original_path)
         os.remove(chorus_path)
-        os.remove(slow_path)
     except OSError:
         pass
 
@@ -214,7 +222,7 @@ def vapor(query, bot, request_id, chat_id):
 @run_async
 def help_command(bot, update):
     """ /help - Shows usage """
-    bot.send_message(chat_id=update.message.chat_id, text=emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\"\n" + emoji_video_camera + " /vapor YouTube URL.")
+    bot.send_message(chat_id=update.message.chat_id, text=emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\"\n" + emoji_video_camera + " /vapor YouTube URL.\n\nWorks with videos between 5 seconds and 10 minutes.")
 
 
 @run_async
