@@ -294,12 +294,12 @@ def main():
         os.chdir("cache")
 
     # Start the webhook
-    # updater.start_webhook(listen="0.0.0.0",
-                        #   port=int(PORT),
-                        #   url_path=BOT_TOKEN)
-    # updater.bot.setWebhook("https://{}.herokuapp.com/{}".format(HEROKU_NAME, BOT_TOKEN))
+    updater.start_webhook(listen="0.0.0.0",
+                          port=int(PORT),
+                          url_path=BOT_TOKEN)
+    updater.bot.setWebhook("https://{}.herokuapp.com/{}".format(HEROKU_NAME, BOT_TOKEN))
     logger.info("Bot ready.")
-    updater.start_polling()
+    # updater.start_polling()
     updater.idle()
 
 
