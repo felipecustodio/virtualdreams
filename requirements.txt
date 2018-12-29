@@ -1,6 +1,10 @@
+
+python-dotenv
+python-telegram-bot
 emoji
+pysndfx
+pydub
+soundfile
 pychorus
-python_dotenv
-python_telegram_bot
 youtube_dl
 soundfile
