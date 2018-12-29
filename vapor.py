@@ -147,6 +147,7 @@ def vapor(query, bot, request_id, chat_id):
         'quiet': 'True',
         'format': 'bestaudio/best',
         'outtmpl': str(request_id) +'.%(ext)s',
+        'prefer-ffmpeg': 'True', 
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'wav',
