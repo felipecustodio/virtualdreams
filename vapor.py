@@ -18,6 +18,8 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from telegram.ext.dispatcher import run_async
 from telegram import InlineQueryResultArticle, InputTextMessageContent, ChatAction
 from emoji import emojize
+# audio manipulation
+from pysndfx import AudioEffectsChain
 # youtube search
 import urllib.request
 import urllib.parse
@@ -50,9 +52,25 @@ emoji_palm_tree = emojize(":palm_tree:", use_aliases=True)
 emoji_video_camera = emojize(":video_camera:", use_aliases=True)
 emoji_cd = emojize(":cd:", use_aliases=True)
 
+# vaporwave parameters
+fx = (
+        AudioEffectsChain()
+        .speed(0.63)
+        .reverb(
+               reverberance=50,
+               hf_damping=50,
+               room_scale=100,
+               stereo_depth=100,
+               pre_delay=20,
+               wet_gain=0,
+               wet_only=False
+               )
+    )
+
 # restrict commands to admin
 # @felup.io (bot admin)
 LIST_OF_ADMINS = [71491472]
+
 
 def restricted(func):
     @wraps(func)
@@ -63,17 +81,6 @@ def restricted(func):
             return
         return func(bot, update, *args, **kwargs)
     return wrapped
-
-# typing function decorator
-def send_upload_action(func):
-    """Sends typing action while processing func command."""
-
-    @wraps(func)
-    def command_func(*args, **kwargs):
-        bot, update = args
-        bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.UPLOAD_AUDIO)
-        func(bot, update, **kwargs)
-    return command_func
 
 
 def vapor(query, bot, request_id, chat_id):
@@ -165,25 +172,23 @@ def vapor(query, bot, request_id, chat_id):
             pass
         raise ValueError('Could not find chorus of ' + str(full_title) + '.')
 
-    # slow down music
+    # make it vaporwave
+    # cmd = "sox −V0 -v 0.99 " + chorus_path + " " + slow_path + " speed " + str(0.63)
+    # os.system(cmd)
+    # # vapor music
+    # cmd = "sox −V0 -v 0.99 " + slow_path + " " + vapor_path + " reverb 100"
+    # os.system(cmd)
+
     logger.info("[{}] Applying Vaporwave FX.".format(str(request_id)))
-    cmd = "sox −V0 -v 0.99 " + chorus_path + " " + slow_path + " speed " + str(0.63)
-    os.system(cmd)
-    # vapor music
-    cmd = "sox −V0 -v 0.99 " + slow_path + " " + vapor_path + " reverb 100"
-    os.system(cmd)
+    
+    infile = chorus_path
+    outfile = vapor_path
+    fx(infile, outfile)
 
     # send audio to user
     logger.info("[{}] Sending audio.".format(str(request_id), ))
     vapor_path = title + "_vapor.wav"
     bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
-
-    # check if cache size is big and warn admin
-    cache_size = sum(os.path.getsize(f) for f in os.listdir('.') if os.path.isfile(f)) * 0.000001
-    logger.info("[{}] Current cache size: {}".format(str(request_id), str(cache_size)))
-    if (cache_size > 500):
-        logger.info("Warning admin about cache size.")
-        bot.send_message(chat_id=LIST_OF_ADMINS[0], text=emoji_cd + " Cache is over 500MB! Bot needs restart.")
 
     # cleanup
     logger.info("[{}] Cleanup temporary files.".format(str(request_id), ))
@@ -194,23 +199,27 @@ def vapor(query, bot, request_id, chat_id):
     except OSError:
         pass
 
+    # check cache size
+    cache_size = sum(os.path.getsize(f) for f in os.listdir('.') if os.path.isfile(f)) * 0.000001
+    logger.info("[{}] Current cache size: {}".format(str(request_id), str(cache_size)))
+    if (cache_size > 500):
+        logger.info("Cache size above limit. Cleaning up...")
+        for filename in os.listdir():
+            if filename.endswith(('.mp3', '.wav')):
+                os.remove(filename)
+        os.chdir("..")
+
 
 # bot handlers
-@restricted
-def test_command(bot, update):
-    """ Test if bot is alive (returns True for CI) """
-    bot.send_message(chat_id=LIST_OF_ADMINS[0], text=emoji_palm_tree + " Virtual Dreams is ONLINE.")
-    return True
-
-
 @run_async
 def help_command(bot, update):
+    """ /help - Shows usage """
     bot.send_message(chat_id=update.message.chat_id, text=emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\"\n" + emoji_video_camera + " /vapor YouTube URL.")
 
 
 @run_async
-@send_upload_action
 def vapor_command(bot, update):
+    """ /vapor - Request handler """
     request_id = update.message.message_id
     chat_id = update.message.chat_id
     logger.info("[{}] {} has requested{}".format(str(request_id), str(update.message.from_user.username), update.message.text.replace('/vapor','')))
@@ -243,6 +252,7 @@ def error_handler(bot, update, error):
 
 
 def main():
+    logger.info("Initializing...")
     # set env variables
     load_dotenv()
     BOT_TOKEN = os.getenv("TOKEN")
@@ -252,36 +262,16 @@ def main():
     updater = Updater(token=BOT_TOKEN)
     dispatcher = updater.dispatcher
 
-    def stop_and_restart():
-        """ Clear cache """
-        for filename in os.listdir():
-            if filename.endswith(('.mp3', '.wav')):
-                os.remove(filename)
-        os.chdir("..")
-        
-        """Gracefully stop the Updater and replace the current process with a new one"""
-        updater.stop()
-        os.execl(sys.executable, sys.executable, *sys.argv)
-
-    @restricted
-    def restart(bot, update):
-        update.message.reply_text('Bot is restarting...')
-        Thread(target=stop_and_restart).start()
-
     # define bot handlers
     help_handler = CommandHandler('help', help_command)
     start_handler = CommandHandler('start', help_command)
     vapor_handler = CommandHandler('vapor', vapor_command)
-    test_handler = CommandHandler('test', test_command)
-    restart_handler = CommandHandler('restart', restart)
     unknown_handler = MessageHandler(Filters.command, unknown_command)
 
     # start bot handlers
     dispatcher.add_handler(start_handler)
     dispatcher.add_handler(help_handler)
     dispatcher.add_handler(vapor_handler)
-    dispatcher.add_handler(test_handler)
-    dispatcher.add_handler(restart_handler)
     dispatcher.add_handler(unknown_handler)
     dispatcher.add_error_handler(error_handler)
 
@@ -296,11 +286,12 @@ def main():
         os.chdir("cache")
 
     # Start the webhook
-    updater.start_webhook(listen="0.0.0.0",
-                          port=int(PORT),
-                          url_path=BOT_TOKEN)
-    updater.bot.setWebhook("https://{}.herokuapp.com/{}".format(HEROKU_NAME, BOT_TOKEN))
-    logger.info("Bot ready. Directory: {}".format(str(os.getcwd())))
+    # updater.start_webhook(listen="0.0.0.0",
+                        #   port=int(PORT),
+                        #   url_path=BOT_TOKEN)
+    # updater.bot.setWebhook("https://{}.herokuapp.com/{}".format(HEROKU_NAME, BOT_TOKEN))
+    logger.info("Bot ready.")
+    updater.start_polling()
     updater.idle()
 
 
