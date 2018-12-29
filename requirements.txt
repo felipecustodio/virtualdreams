@@ -1,4 +1,3 @@
-
 python-dotenv
 python-telegram-bot
 emoji
@@ -6,5 +5,5 @@ pysndfx
 pydub
 soundfile
 pychorus
-youtube_dl
+youtube_dl==2018.12.17
 soundfile
