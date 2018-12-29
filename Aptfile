@@ -2,9 +2,5 @@ libgsl0ldbl
 libsndfile1
 libsndfile1-dev
 libsndfile1-dbgsym
-libvpx
-libavcodec-extra-52
 libmp3lame0
 sox
-ffmpeg
-ffprobe
