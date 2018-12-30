@@ -1,0 +1,235 @@
+@font-face {
+	font-family: 'Computer Modern Serif';
+	src: url('font/cmunrm.eot');
+	src: url('font/cmunrm.eot?#iefix') format('embedded-opentype'),
+		 url('font/cmunrm.woff') format('woff'),
+		 url('font/cmunrm.ttf') format('truetype'),
+		 url('font/cmunrm.svg#cmunrm') format('svg');
+	font-weight: normal;
+	font-style: normal;
+}
+
+
+@font-face {
+	font-family: 'Computer Modern Serif';
+	src: url('font/cmunbx.eot');
+	src: url('font/cmunbx.eot?#iefix') format('embedded-opentype'),
+		 url('font/cmunbx.woff') format('woff'),
+		 url('font/cmunbx.ttf') format('truetype'),
+		 url('font/cmunbx.svg#cmunbx') format('svg');
+	font-weight: bold;
+	font-style: normal;
+}
+
+
+@font-face {
+	font-family: 'Computer Modern Serif';
+	src: url('font/cmunti.eot');
+	src: url('font/cmunti.eot?#iefix') format('embedded-opentype'),
+		 url('font/cmunti.woff') format('woff'),
+		 url('font/cmunti.ttf') format('truetype'),
+		 url('font/cmunti.svg#cmunti') format('svg');
+	font-weight: normal;
+	font-style: italic;
+}
+
+
+@font-face {
+	font-family: 'Computer Modern Serif';
+	src: url('font/cmunbi.eot');
+	src: url('font/cmunbi.eot?#iefix') format('embedded-opentype'),
+		 url('font/cmunbi.woff') format('woff'),
+		 url('font/cmunbi.ttf') format('truetype'),
+		 url('font/cmunbi.svg#cmunbi') format('svg');
+	font-weight: bold;
+	font-style: italic;
+}
+
+html {
+  background-color: black;
+}
+
+body {
+  font-family: "Computer Modern", serif;
+  color: #fbeed7;
+  opacity: 1;
+  transition: 1s opacity;
+}
+
+body.fade-out {
+  opacity: 0;
+  transition: none;
+}
+
+h1 {
+  font-size: 100pt;
+  /* font-size: 6.25em; */
+}
+
+@media only screen and (max-width: 444px) {
+
+  h1 { 
+     font-size: 4em; 
+  }
+
+  h2 {
+    font-size: 1.1em;
+  }
+
+}
+
+a,h1,h2 {
+  -o-transition:.5s;
+  -ms-transition:.5s;
+  -moz-transition:.5s;
+  -webkit-transition:.5s;
+  transition:.5s;
+  transition-timing-function: ease;
+}
+  
+a:hover {
+  color: #FF6AD5 !important;
+  cursor:pointer;
+}
+
+h1:hover {
+  color: #FF6AD5;
+}
+
+h2:hover {
+  color: #FF6AD5;
+}
+
+audio { 
+  display:none;
+}
+
+canvas {
+  position:absolute;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  z-index: -3 !important;
+}
+
+.outer {
+  display: table;
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.middle {
+  display: table-cell;
+  vertical-align: middle;
+}
+
+.inner {
+  margin-left: auto;
+  margin-right: auto;
+  /* width: 400px; */
+}
+
+.fullscreen-bg {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  overflow: hidden;
+  z-index: -100;
+}
+
+.fullscreen-bg__video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+@media (min-aspect-ratio: 16/9) {
+  .fullscreen-bg__video {
+    height: 300%;
+    top: -100%;
+  }
+}
+
+@media (max-aspect-ratio: 16/9) {
+  .fullscreen-bg__video {
+    width: 300%;
+    left: -100%;
+  }
+}
+
+/* button */
+input { 
+  display: inline !important; 
+}
+
+button {
+  font-weight: regular;
+  font-size: 50px;
+  line-height: 1;
+  color: #665c84;
+  letter-spacing: 0.025em;
+  background: #FFCBFF;
+  padding: 18px 0 11px;
+  cursor: pointer;
+  /* border: 0; */
+  border: #665c84;
+  border-radius: 5px;
+  min-width: 120px;
+  overflow: hidden;
+
+  /* position: absolute; */
+  /* top: 50%; */
+  /* left: 50%; */
+  transform: translate(-00%, -00%);
+}
+
+button span {
+  display: block;
+  position: relative;
+  z-index: 10;
+}
+
+button:after,
+button:before {
+  padding: 80px 0 11px;
+  content: '';
+  position: absolute;
+  top: 0;
+  left: calc(-100% - 30px);
+  height: calc(100% - 29px);
+  width: calc(100% + 20px);
+  color: #fff;
+  border-radius: 2px;
+  transform: skew(-25deg);
+}
+
+button:after {
+  background: #FF6AD5;
+  transition: left 0.8s cubic-bezier(0.86, 0, 0.07, 1) 0.2s;
+  z-index: 0;
+  opacity: 0.8;
+}
+
+button:before {
+  background: #CCFFFF;
+  z-index: 5;
+  transition: left 1s cubic-bezier(0.86, 0, 0.07, 1);
+}
+
+button:hover:after {
+  left: calc(0% - 10px);
+  transition: left 0.8s cubic-bezier(0.86, 0, 0.07, 1);
+}
+
+button:hover:before {
+  left: calc(0% - 10px);
+  transition: left 1s cubic-bezier(0.86, 0, 0.07, 1);
+}
