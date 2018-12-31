@@ -21,19 +21,24 @@ from emoji import emojize
 # audio manipulation
 from pysndfx import AudioEffectsChain
 from pydub import AudioSegment
-# youtube search
+from pychorus import find_and_output_chorus
+# youtube
 import urllib.request
 import urllib.parse
 import re
-# youtube downloader
 import youtube_dl
-# chorus finder
-from pychorus import find_and_output_chorus
 # logging
+import re
 import logging
-logging.basicConfig(level=logging.INFO)
+from datetime import datetime
 logger = logging.getLogger(__name__)
-
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+    handlers=[
+        logging.FileHandler("requests.log"),
+        logging.StreamHandler()
+    ])
 # profiling
 from timeit import default_timer as timer
 
@@ -41,12 +46,7 @@ from timeit import default_timer as timer
 youtube_urls = ('youtube.com', 'https://www.youtube.com/', 'http://www.youtube.com/', 'http://youtu.be/', 'https://youtu.be/', 'youtu.be')
 
 # video duration limit
-MAX_DURATION = 600  # seconds (10 minutes)
-
-# fullwidth translation
-HALFWIDTH_TO_FULLWIDTH = str.maketrans(
-    '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&()*+,-./:;<=>?@[]^_`{|}~',
-    '０１２３４５６７８９ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ！゛＃＄％＆（）＊＋、ー。／：；〈＝〉？＠［］＾＿‘｛｜｝～')
+MAX_DURATION = 420  # seconds (7 minutes)
 
 # emojis
 emoji_palm_tree = emojize(":palm_tree:", use_aliases=True)
@@ -68,20 +68,9 @@ fx = (
                )
     )
 
-# restrict commands to admin
+
 # @felup.io (bot admin)
 LIST_OF_ADMINS = [71491472]
-
-
-def restricted(func):
-    @wraps(func)
-    def wrapped(bot, update, *args, **kwargs):
-        user_id = update.effective_user.id
-        if user_id not in LIST_OF_ADMINS:
-            logger.error("Unauthorized access denied for {}.".format(user_id))
-            return
-        return func(bot, update, *args, **kwargs)
-    return wrapped
 
 
 def vapor(query, bot, request_id, chat_id):
@@ -96,10 +85,10 @@ def vapor(query, bot, request_id, chat_id):
 
     Query can be YouTube link. 
     """
-    logger.info("[{}] Working on request...".format(str(request_id)))
+    # logger.info("[{}] Working on request...".format(str(request_id)))
 
     # check if query is youtube url
-    logger.info("[{}] Searching for query on YouTube...".format(str(request_id)))
+    # logger.info("[{}] Searching for query on YouTube...".format(str(request_id)))
     
     if not query.lower().startswith((youtube_urls)):
         # search for youtube videos matching query
@@ -136,13 +125,13 @@ def vapor(query, bot, request_id, chat_id):
     # check if cached audio exists
     vapor_path = Path(title + "_vapor.wav")
     if vapor_path.is_file():
-        logger.info("[{}] Found {} cached.".format(str(request_id), str(vapor_path)))
+        # logger.info("[{}] Found {} cached.".format(str(request_id), str(vapor_path)))
         vapor_path = title + "_vapor.wav"
         bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
         return 
 
     # download video and extract mp3 audio
-    logger.info("[{}] Downloading audio...".format(str(request_id)))
+    # logger.info("[{}] Downloading audio...".format(str(request_id)))
     ydl_opts = {
         'quiet': 'True',
         'format': 'bestaudio/best',
@@ -161,22 +150,23 @@ def vapor(query, bot, request_id, chat_id):
         except:
             raise ValueError('Could not download ' + str(full_title) + '.')
 
-    # prepare audio files paths
-    original_path = str(request_id) + ".wav"
-    chorus_path = str(request_id) + "_chorus.wav"
-    vapor_path = title + "_vapor.wav"
+    # prepare audio files paths (for all systems)
+    root = os.getcwd()
+    original_path = os.path.join(root, (str(request_id) + ".wav"))
+    chorus_path = os.path.join(root, (str(request_id) + "_chorus.wav"))
+    vapor_path = os.path.join(root, (str(request_id) + "_vapor.wav"))
 
     # find and extract music chorus
-    logger.info("[{}] Searching for song chorus...".format(str(request_id)))
+    # logger.info("[{}] Searching for song chorus...".format(str(request_id)))
     chorus = False
-    chorus_duration = 15
+    chorus_duration = 15 # anything bigger would consume too much memory
     while (not chorus and chorus_duration > 0):
         chorus = find_and_output_chorus(original_path, chorus_path, 15)
         chorus_duration -= 5
     
     if (not chorus):
         # doesnt have chorus, use first seconds as chorus
-        logger.info("[{}] Chorus not found. Trying initial seconds...".format(str(request_id)))
+        # logger.info("[{}] Chorus not found. Trying initial seconds...".format(str(request_id)))
         chorus_duration = 15 # reset durations
         song = AudioSegment.from_wav(original_path)
         
@@ -190,64 +180,63 @@ def vapor(query, bot, request_id, chat_id):
         first_seconds.export(chorus_path, format="wav")
 
     # make it vaporwave (python wrapper for sox)
-    logger.info("[{}] Applying Vaporwave FX.".format(str(request_id)))
-    infile = chorus_path
-    outfile = vapor_path
+    vapor_path = title + "_vapor.wav"
+    # logger.info("[{}] Applying Vaporwave FX.".format(str(request_id)))
+    
+    infile = repr(chorus_path)
+    outfile = repr(vapor_path)
+
     fx(infile, outfile)
 
     # send audio to user
-    logger.info("[{}] Sending audio.".format(str(request_id), ))
-    vapor_path = title + "_vapor.wav"
+    # logger.info("[{}] Sending audio.".format(str(request_id), ))
     bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
 
     # cleanup
-    logger.info("[{}] Cleanup temporary files.".format(str(request_id), ))
+    # logger.info("[{}] Cleanup temporary files.".format(str(request_id), ))
     try:
         os.remove(original_path)
         os.remove(chorus_path)
     except OSError:
         pass
 
-    # check cache size
-    cache_size = sum(os.path.getsize(f) for f in os.listdir('.') if os.path.isfile(f)) * 0.000001
-    logger.info("[{}] Current cache size: {}".format(str(request_id), str(cache_size)))
-    if (cache_size > 500):
-        logger.info("Cache size above limit. Cleaning up...")
-        for filename in os.listdir():
-            if filename.endswith(('.mp3', '.wav')):
-                os.remove(filename)
-        os.chdir("..")
-
 
 # bot handlers
 @run_async
 def help_command(bot, update):
     """ /help - Shows usage """
-    bot.send_message(chat_id=update.message.chat_id, text=emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\"\n" + emoji_video_camera + " /vapor YouTube URL.\n\nWorks with videos between 5 seconds and 10 minutes.")
+    bot.send_message(chat_id=update.message.chat_id, text=emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\"\n" + emoji_video_camera + " /vapor YouTube URL.\n\nWorks with videos between 5 seconds and 7 minutes.\n\nIf your request is taking too long, please try again.\n")
 
 
 @run_async
 def vapor_command(bot, update):
     """ /vapor - Request handler """
+    request_date = str(datetime.now())
     request_id = update.message.message_id
+    username = str(update.message.from_user.username)
+    request_text = update.message.text.replace('/vapor ','')
     chat_id = update.message.chat_id
-    logger.info("[{}] {} has requested{}".format(str(request_id), str(update.message.from_user.username), update.message.text.replace('/vapor','')))
+    # logger.info("[{}] {} has requested: {}".format(str(request_id), str(username), str(request_text)))
 
     if (len(str(update.message.text.replace('/vapor',''))) < 5):
-        logger.error("[{}] ERROR: Query too small.".format(request_id))
+        # logger.error("[{}] ERROR: Query too small.".format(request_id))
         bot.send_message(chat_id=chat_id, text=emoji_cd + " ＥＲＲＯＲ.\nI need a bigger query!")
         return
 
-    bot.send_message(chat_id=chat_id, text=emoji_palm_tree  + " ＷＯＲＫＩＮＧ．．．\nThis can take up a bit more than a minute. Sit back and relax.")
+    bot.send_message(chat_id=chat_id, text=emoji_palm_tree  + " ＷＯＲＫＩＮＧ．．．\nThis can take up a bit more than a minute. Sit back and relax. If you don't hear back from me, try again!")
+    success = "success"
     try:
         start = timer()
-        vapor(update.message.text.replace('/vapor',''), bot, request_id, chat_id)
+        vapor(request_text, bot, request_id, chat_id)
     except ValueError as error:
-        logger.error("[{}] ERROR: {}".format(request_id, str(error)))
+        # logger.error("[{}] ERROR: {}".format(request_id, str(error)))
+        success = "failed"
         bot.send_message(chat_id=chat_id, text=emoji_cd + " ＥＲＲＯＲ.\n" + str(error))
     finally:
         end = timer()
-        logger.info("[{}] Finished request in {}s.".format(str(request_id), str(end - start)))
+        elapsed = str(end - start)
+        # logger.info("[{}] Finished request in {}s.".format(str(request_id), elapsed))
+        logger.info("{},{},{},{},{},{}".format(request_date, str(request_id), str(username), str(request_text), str(success), str(elapsed)))
 
 
 @run_async
@@ -262,13 +251,14 @@ def error_handler(bot, update, error):
 
 def main():
     logger.info("Initializing...")
+    
     # set env variables
     load_dotenv()
     BOT_TOKEN = os.getenv("TOKEN")
     HEROKU_NAME = "virtualdreamsbot"
     PORT = int(os.environ.get('PORT', '8443'))
 
-    updater = Updater(token=BOT_TOKEN)
+    updater = Updater(token=BOT_TOKEN, workers=2)
     dispatcher = updater.dispatcher
 
     # define bot handlers
@@ -294,13 +284,15 @@ def main():
     else:
         os.chdir("cache")
 
-    # webhook
-    updater.start_webhook(listen="0.0.0.0",
-                          port=PORT,
-                          url_path=BOT_TOKEN)
-    updater.bot.setWebhook("https://{}.herokuapp.com/{}".format(HEROKU_NAME, BOT_TOKEN))
-    logger.info("Bot ready.")
-    # updater.start_polling()
+    # heroku webhook
+    # updater.start_webhook(listen="0.0.0.0",
+                        #   port=PORT,
+                        #   url_path=BOT_TOKEN)
+    # updater.bot.setWebhook("https://{}.herokuapp.com/{}".format(HEROKU_NAME, BOT_TOKEN))
+    logger.info("Bot ready. Working directory: {}".format(os.getcwd()))
+    logger.info("date,request_id,username,request_text,success,time_elapsed")
+    # local
+    updater.start_polling()
     updater.idle()
 
 
