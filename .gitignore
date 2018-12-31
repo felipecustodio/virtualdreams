@@ -1,5 +1,7 @@
 cache/
-.env
-.wav
-.mp3
-.bundle
+backup/
+*.log
+*.env
+*.wav
+*.mp3
+*.bundle
