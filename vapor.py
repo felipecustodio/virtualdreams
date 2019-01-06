@@ -31,12 +31,14 @@ import youtube_dl
 import re
 import logging
 from datetime import datetime
+import time
+timestr = time.strftime("%Y%m%d-")
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
     format="%(message)s",
     handlers=[
-        logging.FileHandler("requests.log"),
+        logging.FileHandler(timestr + "requests.log"),
         logging.StreamHandler()
     ])
 # profiling
@@ -78,18 +80,21 @@ def vapor(query, bot, request_id, chat_id):
 
     Searches YouTube for 'query', finds first match that has
     duration under the limit, download video with youtube_dl
-    and extract .mp3 audio with ffmpeg. Extract chorus using
+    and extract .wav audio with ffmpeg. Extract chorus using
     pychorus. If it fails, try smaller chorus' times.
     Using sox, slow down and apply reverb. 
     Return vaporwaved audio.
 
     Query can be YouTube link. 
     """
-    # logger.info("[{}] Working on request...".format(str(request_id)))
+    if (len(query) < 5):
+        status = "failed"
+        bot.send_message(chat_id=chat_id, text=emoji_cd + " Hey, send me a bigger query!")
+        raise ValueError('Query is too small.')
+
+    bot.send_message(chat_id=chat_id, text=emoji_palm_tree  + " ＷＯＲＫＩＮＧ．．．\nThis can take up a bit more than a minute. Sit back and relax. If you don't hear back from me, try again!")
 
     # check if query is youtube url
-    # logger.info("[{}] Searching for query on YouTube...".format(str(request_id)))
-    
     if not query.lower().startswith((youtube_urls)):
         # search for youtube videos matching query
         query_string = urllib.parse.urlencode({"search_query" : query})
@@ -100,7 +105,10 @@ def vapor(query, bot, request_id, chat_id):
         # find video that fits max duration
         for url in search_results:
             # check for video duration
-            info = youtube_dl.YoutubeDL().extract_info(url,download = False)
+            try:
+                info = youtube_dl.YoutubeDL().extract_info(url,download = False)
+            except:
+                raise ValueError('Could not get information about video.')
             full_title = info['title']
             if (info['duration'] < MAX_DURATION and info['duration'] >= 5):
                 # get first video that fits the limit duration
@@ -125,18 +133,20 @@ def vapor(query, bot, request_id, chat_id):
     # check if cached audio exists
     vapor_path = Path(title + "_vapor.wav")
     if vapor_path.is_file():
-        # logger.info("[{}] Found {} cached.".format(str(request_id), str(vapor_path)))
         vapor_path = title + "_vapor.wav"
-        bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
+        try:
+            bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
+        except:
+            raise ValueError('Failed to send audio.')
         return 
 
-    # download video and extract mp3 audio
-    # logger.info("[{}] Downloading audio...".format(str(request_id)))
+    # download video and extract audio
     ydl_opts = {
         'quiet': 'True',
         'format': 'bestaudio/best',
         'outtmpl': str(request_id) +'.%(ext)s',
-        'prefer-ffmpeg': 'True', 
+        'prefer_ffmpeg': 'True', 
+        'noplaylist': 'True',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'wav',
@@ -157,7 +167,6 @@ def vapor(query, bot, request_id, chat_id):
     vapor_path = os.path.join(root, (str(request_id) + "_vapor.wav"))
 
     # find and extract music chorus
-    # logger.info("[{}] Searching for song chorus...".format(str(request_id)))
     chorus = False
     chorus_duration = 15 # anything bigger would consume too much memory
     while (not chorus and chorus_duration > 0):
@@ -166,7 +175,6 @@ def vapor(query, bot, request_id, chat_id):
     
     if (not chorus):
         # doesnt have chorus, use first seconds as chorus
-        # logger.info("[{}] Chorus not found. Trying initial seconds...".format(str(request_id)))
         chorus_duration = 15 # reset durations
         song = AudioSegment.from_wav(original_path)
         
@@ -181,19 +189,22 @@ def vapor(query, bot, request_id, chat_id):
 
     # make it vaporwave (python wrapper for sox)
     vapor_path = title + "_vapor.wav"
-    # logger.info("[{}] Applying Vaporwave FX.".format(str(request_id)))
     
     infile = repr(chorus_path)
     outfile = repr(vapor_path)
 
-    fx(infile, outfile)
+    try:
+        fx(infile, outfile)
+    except:
+        raise ValueError('Failed to apply Vaporwave FX.')
 
     # send audio to user
-    # logger.info("[{}] Sending audio.".format(str(request_id), ))
-    bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
+    try:
+        bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
+    except:
+        raise ValueError('Failed to send audio.')
 
     # cleanup
-    # logger.info("[{}] Cleanup temporary files.".format(str(request_id), ))
     try:
         os.remove(original_path)
         os.remove(chorus_path)
@@ -211,32 +222,23 @@ def help_command(bot, update):
 @run_async
 def vapor_command(bot, update):
     """ /vapor - Request handler """
-    request_date = str(datetime.now())
+    request_date = time.strftime("%Y%m%d-%H%M%S")
     request_id = update.message.message_id
-    username = str(update.message.from_user.username)
-    request_text = update.message.text.replace('/vapor ','')
+    username = str((str(update.message.from_user.username).encode('ascii',errors='ignore')).decode())
+    request_text = update.message.text.replace('/vapor ','')[:50]
     chat_id = update.message.chat_id
-    # logger.info("[{}] {} has requested: {}".format(str(request_id), str(username), str(request_text)))
+    status = "success"
 
-    if (len(str(update.message.text.replace('/vapor',''))) < 5):
-        # logger.error("[{}] ERROR: Query too small.".format(request_id))
-        bot.send_message(chat_id=chat_id, text=emoji_cd + " ＥＲＲＯＲ.\nI need a bigger query!")
-        return
-
-    bot.send_message(chat_id=chat_id, text=emoji_palm_tree  + " ＷＯＲＫＩＮＧ．．．\nThis can take up a bit more than a minute. Sit back and relax. If you don't hear back from me, try again!")
-    success = "success"
     try:
         start = timer()
         vapor(request_text, bot, request_id, chat_id)
-    except ValueError as error:
-        # logger.error("[{}] ERROR: {}".format(request_id, str(error)))
-        success = "failed"
-        bot.send_message(chat_id=chat_id, text=emoji_cd + " ＥＲＲＯＲ.\n" + str(error))
+    except ValueError:
+        status = "failed"
+        bot.send_message(chat_id=chat_id, text=emoji_cd + " ＥＲＲＯＲ.\nSomething went wrong...\n\nPlease try again!")
     finally:
         end = timer()
         elapsed = str(end - start)
-        # logger.info("[{}] Finished request in {}s.".format(str(request_id), elapsed))
-        logger.info("{},{},{},{},{},{}".format(request_date, str(request_id), str(username), str(request_text), str(success), str(elapsed)))
+        logger.info("{},{},{},{},{},{}".format(request_date, str(request_id), str(username), str(request_text), str(status), str(elapsed)))
 
 
 @run_async
@@ -289,9 +291,9 @@ def main():
                         #   port=PORT,
                         #   url_path=BOT_TOKEN)
     # updater.bot.setWebhook("https://{}.herokuapp.com/{}".format(HEROKU_NAME, BOT_TOKEN))
-    logger.info("Bot ready. Working directory: {}".format(os.getcwd()))
+
     logger.info("date,request_id,username,request_text,success,time_elapsed")
-    # local
+    # local hosting
     updater.start_polling()
     updater.idle()
 
