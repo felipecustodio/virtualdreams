@@ -33,12 +33,14 @@ import logging
 from datetime import datetime
 import time
 timestr = time.strftime("%Y%m%d-")
+logdir = os.path.join(os.getcwd(), 'logs')
+logfile = os.path.join(logdir, (timestr + "requests.log"))
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
     format="%(message)s",
     handlers=[
-        logging.FileHandler(timestr + "requests.log"),
+        logging.FileHandler(logfile),
         logging.StreamHandler()
     ])
 # profiling
@@ -87,8 +89,20 @@ def vapor(query, bot, request_id, chat_id):
 
     Query can be YouTube link. 
     """
+    ydl_opts = {
+        'quiet': 'True',
+        'format': 'bestaudio/best',
+        'outtmpl': str(request_id) +'.%(ext)s',
+        'prefer_ffmpeg': 'True', 
+        'noplaylist': 'True',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'wav',
+            'preferredquality': '192',
+        }],
+    }
+
     if (len(query) < 5):
-        status = "failed"
         bot.send_message(chat_id=chat_id, text=emoji_cd + " Hey, send me a bigger query!")
         raise ValueError('Query is too small.')
 
@@ -106,7 +120,7 @@ def vapor(query, bot, request_id, chat_id):
         for url in search_results:
             # check for video duration
             try:
-                info = youtube_dl.YoutubeDL().extract_info(url,download = False)
+                info = youtube_dl.YoutubeDL(ydl_opts).extract_info(url,download = False)
             except:
                 raise ValueError('Could not get information about video.')
             full_title = info['title']
@@ -121,7 +135,7 @@ def vapor(query, bot, request_id, chat_id):
     # query was a youtube link
     else:
         url = query    
-        info = youtube_dl.YoutubeDL().extract_info(url,download = False)
+        info = youtube_dl.YoutubeDL(ydl_opts).extract_info(url,download = False)
         # check if video fits limit duration
         if (info['duration'] < 5 or info['duration'] > MAX_DURATION):
             raise ValueError('Video too short!')
@@ -141,19 +155,6 @@ def vapor(query, bot, request_id, chat_id):
         return 
 
     # download video and extract audio
-    ydl_opts = {
-        'quiet': 'True',
-        'format': 'bestaudio/best',
-        'outtmpl': str(request_id) +'.%(ext)s',
-        'prefer_ffmpeg': 'True', 
-        'noplaylist': 'True',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'wav',
-            'preferredquality': '192',
-        }],
-    }
-
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         try:
             ydl.download([url])
@@ -225,7 +226,7 @@ def vapor_command(bot, update):
     request_date = time.strftime("%Y%m%d-%H%M%S")
     request_id = update.message.message_id
     username = str((str(update.message.from_user.username).encode('ascii',errors='ignore')).decode())
-    request_text = update.message.text.replace('/vapor ','')[:50]
+    request_text = update.message.text.replace('/vapor ',' ')
     chat_id = update.message.chat_id
     status = "success"
 
@@ -252,8 +253,6 @@ def error_handler(bot, update, error):
 
 
 def main():
-    logger.info("Initializing...")
-    
     # set env variables
     load_dotenv()
     BOT_TOKEN = os.getenv("TOKEN")
