@@ -4,7 +4,7 @@
 
 __author__  = "Felipe S. Custódio"
 __license__ = "GPL"
-__credits__ = ["WJLiddy", "vivjay"]
+__credits__ = ["felipecustodio","WJLiddy","vivjay"]
 
 # environment
 import os
@@ -12,7 +12,11 @@ import sys
 from threading import Thread
 from pathlib import Path
 from dotenv import load_dotenv
-# bot
+import logging
+from datetime import datetime
+import time
+from timeit import default_timer as timer
+# bot api
 from functools import wraps
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from telegram.ext.dispatcher import run_async
@@ -23,15 +27,12 @@ from pysndfx import AudioEffectsChain
 from pydub import AudioSegment
 from pychorus import find_and_output_chorus
 # youtube
+import re
 import urllib.request
 import urllib.parse
-import re
 import youtube_dl
+
 # logging
-import re
-import logging
-from datetime import datetime
-import time
 timestr = time.strftime("%Y%m%d-")
 logdir = os.path.join(os.getcwd(), 'logs')
 logfile = os.path.join(logdir, (timestr + "requests.log"))
@@ -43,19 +44,9 @@ logging.basicConfig(
         logging.FileHandler(logfile),
         logging.StreamHandler()
     ])
-# profiling
-from timeit import default_timer as timer
 
-# youtube urls for query parsing
-youtube_urls = ('youtube.com', 'https://www.youtube.com/', 'http://www.youtube.com/', 'http://youtu.be/', 'https://youtu.be/', 'youtu.be')
-
-# video duration limit
-MAX_DURATION = 420  # seconds (7 minutes)
-
-# emojis
-emoji_palm_tree = emojize(":palm_tree:", use_aliases=True)
-emoji_video_camera = emojize(":video_camera:", use_aliases=True)
-emoji_cd = emojize(":cd:", use_aliases=True)
+# @felup.io (bot admin)
+LIST_OF_ADMINS = [71491472]
 
 # vaporwave parameters
 fx = (
@@ -72,9 +63,22 @@ fx = (
                )
     )
 
+# video duration limit
+MAX_DURATION = 420  # seconds (7 minutes)
 
-# @felup.io (bot admin)
-LIST_OF_ADMINS = [71491472]
+# youtube urls for query parsing
+youtube_urls = ('youtube.com', 'https://www.youtube.com/', 'http://www.youtube.com/', 'http://youtu.be/', 'https://youtu.be/', 'youtu.be')
+
+# emojis
+emoji_palm_tree = emojize(":palm_tree:", use_aliases=True)
+emoji_video_camera = emojize(":video_camera:", use_aliases=True)
+emoji_cd = emojize(":cd:", use_aliases=True)
+
+# bot messages
+error_str = emoji_cd + " ＥＲＲＯＲ.\nSomething went wrong!\nAn error has occurred or a song name or link wasn't provided.\nPlease try again!"
+working_str = emoji_palm_tree + " ＷＯＲＫＩＮＧ．．．\nThis can take up a bit more than a minute. Sit back and relax. If you don't hear back from me, try again!"
+help_str = emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\"\n" + emoji_video_camera + " /vapor YouTube URL.\n\nWorks with videos between 5 seconds and 7 minutes.\n\nIf your request is taking too long, please try again.\n"
+unknown_str = emoji_cd + " ＥＲＲＯＲ.\nThis is not a valid command. Use /help to find out more."
 
 
 def vapor(query, bot, request_id, chat_id):
@@ -102,11 +106,16 @@ def vapor(query, bot, request_id, chat_id):
         }],
     }
 
-    if (len(query) < 5):
-        bot.send_message(chat_id=chat_id, text=emoji_cd + " Hey, send me a bigger query!")
-        raise ValueError('Query is too small.')
+    # prepare audio files paths (for all systems)
+    root = os.getcwd()
+    original_path = os.path.join(root, (str(request_id) + ".wav"))
+    chorus_path = os.path.join(root, (str(request_id) + "_chorus.wav"))
+    vapor_path = os.path.join(root, (str(request_id) + "_vapor.wav"))
 
-    bot.send_message(chat_id=chat_id, text=emoji_palm_tree  + " ＷＯＲＫＩＮＧ．．．\nThis can take up a bit more than a minute. Sit back and relax. If you don't hear back from me, try again!")
+    if (len(query) < 1):
+        raise ValueError('No query.')
+
+    bot.send_message(chat_id=chat_id, text=working_str)
 
     # check if query is youtube url
     if not query.lower().startswith((youtube_urls)):
@@ -161,12 +170,6 @@ def vapor(query, bot, request_id, chat_id):
         except:
             raise ValueError('Could not download ' + str(full_title) + '.')
 
-    # prepare audio files paths (for all systems)
-    root = os.getcwd()
-    original_path = os.path.join(root, (str(request_id) + ".wav"))
-    chorus_path = os.path.join(root, (str(request_id) + "_chorus.wav"))
-    vapor_path = os.path.join(root, (str(request_id) + "_vapor.wav"))
-
     # find and extract music chorus
     chorus = False
     chorus_duration = 15 # anything bigger would consume too much memory
@@ -175,9 +178,12 @@ def vapor(query, bot, request_id, chat_id):
         chorus_duration -= 5
     
     if (not chorus):
-        # doesnt have chorus, use first seconds as chorus
+        # could not find chorus, use first seconds instead
         chorus_duration = 15 # reset durations
-        song = AudioSegment.from_wav(original_path)
+        try:
+            song = AudioSegment.from_wav(original_path)
+        except:
+            raise ValueError('Failed to get audio segment.')
         
         # get the smallest possible segment
         # video is already guaranteed to be equal or greater than 5 seconds
@@ -217,16 +223,20 @@ def vapor(query, bot, request_id, chat_id):
 @run_async
 def help_command(bot, update):
     """ /help - Shows usage """
-    bot.send_message(chat_id=update.message.chat_id, text=emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\"\n" + emoji_video_camera + " /vapor YouTube URL.\n\nWorks with videos between 5 seconds and 7 minutes.\n\nIf your request is taking too long, please try again.\n")
+    bot.send_message(chat_id=update.message.chat_id, text=help_str)
 
 
 @run_async
 def vapor_command(bot, update):
     """ /vapor - Request handler """
     request_date = time.strftime("%Y%m%d-%H%M%S")
+
     request_id = update.message.message_id
-    username = str((str(update.message.from_user.username).encode('ascii',errors='ignore')).decode())
-    request_text = update.message.text.replace('/vapor ',' ')
+    username = str(bytes(str(update.message.from_user.username), 'utf-8').decode('utf-8', 'ignore'))
+   
+    request_text = update.message.text.replace('/vapor','')
+    request_text = str(bytes(str(request_text), 'utf-8').decode('utf-8', 'ignore'))
+
     chat_id = update.message.chat_id
     status = "success"
 
@@ -235,21 +245,19 @@ def vapor_command(bot, update):
         vapor(request_text, bot, request_id, chat_id)
     except ValueError:
         status = "failed"
-        bot.send_message(chat_id=chat_id, text=emoji_cd + " ＥＲＲＯＲ.\nSomething went wrong...\n\nPlease try again!")
+        bot.send_message(chat_id=chat_id, text=error_str)
     finally:
         end = timer()
         elapsed = str(end - start)
-        logger.info("{},{},{},{},{},{}".format(request_date, str(request_id), str(username), str(request_text), str(status), str(elapsed)))
+        try:
+            logger.info("{},{},{},{},{},{}".format(request_date, str(request_id), str(username), str(request_text), str(status), str(elapsed)))
+        except:
+            pass
 
 
 @run_async
 def unknown_command(bot, update):
-    bot.send_message(chat_id=update.message.chat_id, text=emoji_cd + " ＥＲＲＯＲ.\nThis is not a valid command. Use /help to find out more.")
-
-
-@run_async
-def error_handler(bot, update, error):
-    logger.warning('Update "%s" caused error "%s"', update, error)
+    bot.send_message(chat_id=update.message.chat_id, text=unknown_str)
 
 
 def main():
@@ -273,7 +281,6 @@ def main():
     dispatcher.add_handler(help_handler)
     dispatcher.add_handler(vapor_handler)
     dispatcher.add_handler(unknown_handler)
-    dispatcher.add_error_handler(error_handler)
 
     # move working directory to cache
     if not os.path.exists("cache") and not (str(os.path.basename(os.getcwd())) == "cache"):
@@ -285,13 +292,14 @@ def main():
     else:
         os.chdir("cache")
 
+    logger.info("date,request_id,username,request_text,success,time_elapsed")
+
     # heroku webhook
     # updater.start_webhook(listen="0.0.0.0",
                         #   port=PORT,
                         #   url_path=BOT_TOKEN)
     # updater.bot.setWebhook("https://{}.herokuapp.com/{}".format(HEROKU_NAME, BOT_TOKEN))
 
-    logger.info("date,request_id,username,request_text,success,time_elapsed")
     # local hosting
     updater.start_polling()
     updater.idle()
