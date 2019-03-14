@@ -295,13 +295,13 @@ def main():
     logger.info("date,request_id,username,request_text,success,time_elapsed")
 
     # heroku webhook
-    # updater.start_webhook(listen="0.0.0.0",
+    updater.start_webhook(listen="0.0.0.0",
                         #   port=PORT,
                         #   url_path=BOT_TOKEN)
-    # updater.bot.setWebhook("https://{}.herokuapp.com/{}".format(HEROKU_NAME, BOT_TOKEN))
+    updater.bot.setWebhook("https://{}.herokuapp.com/{}".format(HEROKU_NAME, BOT_TOKEN))
 
     # local hosting
-    updater.start_polling()
+    # updater.start_polling()
     updater.idle()
 
 
