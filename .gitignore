@@ -7,3 +7,4 @@ backup/
 *.bundle
 __pycache__/
 *.pyc
+*.pyo

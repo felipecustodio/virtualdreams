@@ -26,6 +26,8 @@ from emoji import emojize
 from pysndfx import AudioEffectsChain
 from pydub import AudioSegment
 from pychorus import find_and_output_chorus
+# memory management
+from memory_utils import MemoryMonitor, cleanup_memory, log_memory_usage
 # youtube
 import re
 import urllib.request
@@ -77,6 +79,77 @@ working_str = emoji_palm_tree + " ＷＯＲＫＩＮＧ．．．\nThis can take 
 working_remix_str = emoji_palm_tree + " ＣＲＥＡＴＩＮＧ ＲＥＭＩＸ．．．\nGenerating a full remix... This may take several minutes. Please be patient!"
 help_str = emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\" - Quick 15s vaporwave\n" + emoji_cd + " /remix \"song name\" - Full remix (longer)\n" + emoji_video_camera + " /vapor or /remix YouTube URL\n\nWorks with videos between 5 seconds and 7 minutes.\n\nIf your request is taking too long, please try again.\n"
 unknown_str = emoji_cd + " ＥＲＲＯＲ.\nThis is not a valid command. Use /help to find out more."
+
+
+def safe_find_chorus(original_path, chorus_path, duration, request_id):
+    """
+    Memory-safe wrapper for pychorus.find_and_output_chorus with monitoring and limits.
+    
+    Args:
+        original_path: Path to the original audio file
+        chorus_path: Path where the chorus should be saved
+        duration: Duration of the chorus to find
+        request_id: Request ID for logging
+        
+    Returns:
+        bool: True if chorus was found and extracted successfully, False otherwise
+    """
+    # Configure memory monitor with conservative limits
+    # Reduce memory limit for chorus detection to prevent crashes
+    memory_monitor = MemoryMonitor(max_memory_mb=256, timeout_seconds=20)
+    
+    logger.info(f"[{request_id}] Starting chorus detection with {duration}s duration")
+    log_memory_usage(f"[{request_id}] before_chorus_detection")
+    
+    try:
+        # Check if input file exists and is readable
+        if not os.path.exists(original_path):
+            logger.error(f"[{request_id}] Input file does not exist: {original_path}")
+            return False
+            
+        file_size = os.path.getsize(original_path) / (1024 * 1024)  # Size in MB
+        logger.info(f"[{request_id}] Processing audio file of size: {file_size:.2f} MB")
+        
+        # Skip chorus detection for very large files to prevent memory issues
+        if file_size > 50:  # Skip for files larger than 50MB
+            logger.warning(f"[{request_id}] File too large ({file_size:.2f} MB), skipping chorus detection")
+            return False
+        
+        # Wrap the pychorus function with memory monitoring
+        @memory_monitor.with_memory_limit
+        def monitored_find_chorus():
+            return find_and_output_chorus(original_path, chorus_path, duration)
+        
+        # Execute with memory monitoring
+        result = monitored_find_chorus()
+        
+        log_memory_usage(f"[{request_id}] after_chorus_detection")
+        logger.info(f"[{request_id}] Chorus detection completed successfully: {result}")
+        
+        # Verify output file was created if result is True
+        if result and not os.path.exists(chorus_path):
+            logger.warning(f"[{request_id}] Chorus detection returned True but no output file created")
+            result = False
+        
+        # Force cleanup after chorus detection
+        cleanup_memory()
+        
+        return result
+        
+    except MemoryError as e:
+        logger.warning(f"[{request_id}] Chorus detection failed due to memory limit: {e}")
+        cleanup_memory()
+        return False
+        
+    except TimeoutError as e:
+        logger.warning(f"[{request_id}] Chorus detection failed due to timeout: {e}")
+        cleanup_memory()
+        return False
+        
+    except Exception as e:
+        logger.warning(f"[{request_id}] Chorus detection failed with error: {e}")
+        cleanup_memory()
+        return False
 
 
 def vapor(query, bot, request_id, chat_id, remix_mode=False):
@@ -186,25 +259,47 @@ def vapor(query, bot, request_id, chat_id, remix_mode=False):
             logger.error("[" + str(request_id) + "] " + e)
             raise ValueError('Could not download ' + str(full_title) + '.')
 
-    # find and extract music chorus
-    logger.info("[" + str(request_id) + "] " + "Searching for chorus...")
+    # find and extract music chorus with memory management
+    logger.info("[" + str(request_id) + "] " + "Searching for chorus with memory limits...")
+    log_memory_usage(f"[{request_id}] before_chorus_search")
+    
     chorus = False
-    # Set chorus duration based on mode
+    # Set chorus duration based on mode, but limit max attempts for memory management
     initial_chorus_duration = REMIX_CHORUS_DURATION if remix_mode else STANDARD_CHORUS_DURATION
     chorus_duration = initial_chorus_duration
+    max_attempts = 3 # limit attempts to prevent excessive memory usage
+    attempt = 0
     
-    while (not chorus and chorus_duration > 0):
-        chorus = find_and_output_chorus(original_path, chorus_path, chorus_duration)
+    while (not chorus and chorus_duration > 5 and attempt < max_attempts):
+        attempt += 1
+        logger.info(f"[{request_id}] Chorus detection attempt {attempt}/{max_attempts} with duration {chorus_duration}s")
+        
+        try:
+            chorus = safe_find_chorus(original_path, chorus_path, chorus_duration, request_id)
+            if chorus:
+                logger.info(f"[{request_id}] Successfully found chorus with duration {chorus_duration}s")
+                break
+        except Exception as e:
+            logger.warning(f"[{request_id}] Chorus detection attempt {attempt} failed: {e}")
+        
+        # Reduce duration for next attempt to use less memory
         chorus_duration -= 5
+        # Clean up memory between attempts
+        cleanup_memory()
+    
+    log_memory_usage(f"[{request_id}] after_chorus_search")
     
     if (not chorus):
-        logger.info("[" + str(request_id) + "] " + "Could not find chorus, using first segment...")
+        logger.info("[" + str(request_id) + "] " + "Could not find chorus, using first segment with memory management...")
+        log_memory_usage(f"[{request_id}] before_fallback_audio_processing")
+        
         # could not find chorus, use first seconds instead
         chorus_duration = initial_chorus_duration # reset to initial duration
         try:
             song = AudioSegment.from_wav(original_path)
+            log_memory_usage(f"[{request_id}] after_audio_load")
         except Exception as e:
-            logger.error("[" + str(request_id) + "] " + e)
+            logger.error("[" + str(request_id) + "] " + str(e))
             raise ValueError('Failed to get chorus audio segment.')
         
         # get the smallest possible segment
@@ -225,8 +320,15 @@ def vapor(query, bot, request_id, chat_id, remix_mode=False):
                 extended_audio.export(chorus_path, format="wav")
             else:
                 first_seconds.export(chorus_path, format="wav")
+            
+            log_memory_usage(f"[{request_id}] after_audio_export")
+            
+            # Clean up the AudioSegment objects to free memory
+            del song
+            del first_seconds
+            cleanup_memory()
         except Exception as e:
-            logger.error("[" + str(request_id) + "] " + e)
+            logger.error("[" + str(request_id) + "] " + str(e))
             raise ValueError('Failed to export chorus audio segment.')
     else:
         # Chorus was found, extend it if in remix mode
@@ -267,13 +369,19 @@ def vapor(query, bot, request_id, chat_id, remix_mode=False):
         logger.error("[" + str(request_id) + "] " + e)
         raise ValueError('Failed to send audio.')
 
-    # cleanup
+    # cleanup with memory monitoring
+    log_memory_usage(f"[{request_id}] before_cleanup")
     try:
         os.remove(original_path)
         os.remove(chorus_path)
     except OSError as e:
-        logger.error("[" + str(request_id) + "] " + e)
+        logger.error("[" + str(request_id) + "] " + str(e))
         pass
+    
+    # Final memory cleanup
+    cleanup_memory()
+    log_memory_usage(f"[{request_id}] after_cleanup")
+    logger.info(f"[{request_id}] Memory management complete")
 
 
 # bot handlers

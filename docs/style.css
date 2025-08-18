@@ -165,6 +165,21 @@ canvas {
   }
 }
 
+/* Enhanced mobile video support */
+@media (max-width: 768px) {
+  .fullscreen-bg__video {
+    object-fit: cover;
+    width: 100%;
+    height: 100%;
+  }
+  
+  /* Ensure video loads on mobile */
+  .fullscreen-bg {
+    background-color: #000;
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23000"/></svg>');
+  }
+}
+
 /* button */
 input { 
   display: inline !important; 
@@ -232,4 +247,23 @@ button:hover:after {
 button:hover:before {
   left: calc(0% - 10px);
   transition: left 1s cubic-bezier(0.86, 0, 0.07, 1);
+}
+
+/* Mobile touch interactions */
+@media (max-width: 768px) {
+  button:hover:after,
+  button:hover:before {
+    /* Disable hover effects on mobile */
+    left: calc(-100% - 30px);
+  }
+  
+  button:active:after {
+    left: calc(0% - 10px);
+    transition: left 0.4s cubic-bezier(0.86, 0, 0.07, 1);
+  }
+
+  button:active:before {
+    left: calc(0% - 10px);
+    transition: left 0.5s cubic-bezier(0.86, 0, 0.07, 1);
+  }
 }
