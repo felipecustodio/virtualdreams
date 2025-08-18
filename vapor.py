@@ -9,15 +9,14 @@ __credits__ = ["felipecustodio","WJLiddy","vivjay"]
 # environment
 import os
 import sys
-from threading import Thread
+import asyncio
 from pathlib import Path
 from dotenv import load_dotenv
 import logging
 from datetime import datetime
 import time
 from timeit import default_timer as timer
-# bot api
-from functools import wraps
+# bot api - using original imports for compatibility
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from telegram.ext.dispatcher import run_async
 from telegram import InlineQueryResultArticle, InputTextMessageContent, ChatAction
@@ -26,11 +25,11 @@ from emoji import emojize
 from pysndfx import AudioEffectsChain
 from pydub import AudioSegment
 from pychorus import find_and_output_chorus
-# youtube
+# youtube - modernized to use yt-dlp
 import re
 import urllib.request
 import urllib.parse
-import youtube_dl
+import yt_dlp
 
 # logging
 import logzero
@@ -77,7 +76,7 @@ def vapor(query, bot, request_id, chat_id):
     """Returns audio to the vapor command handler
 
     Searches YouTube for 'query', finds first match that has
-    duration under the limit, download video with youtube_dl
+    duration under the limit, download video with yt-dlp
     and extract .wav audio with ffmpeg. Extract chorus using
     pychorus. If it fails, try smaller chorus' times.
     Using sox, slow down and apply reverb. 
@@ -86,11 +85,11 @@ def vapor(query, bot, request_id, chat_id):
     Query can be YouTube link. 
     """
     ydl_opts = {
-        'quiet': 'True',
+        'quiet': True,
         'format': 'bestaudio/best',
         'outtmpl': str(request_id) +'.%(ext)s',
-        'prefer_ffmpeg': 'True', 
-        'noplaylist': 'True',
+        'prefer_ffmpeg': True, 
+        'noplaylist': True,
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'wav',
@@ -112,7 +111,7 @@ def vapor(query, bot, request_id, chat_id):
     try:
         bot.send_message(chat_id=chat_id, text=working_str)
     except Exception as e:
-        logger.error("[" + str(request_id) + "] " + e)
+        logger.error("[" + str(request_id) + "] " + str(e))
         raise ValueError('Could not send message to user ' + str(chat_id))
 
     # check if query is youtube url
@@ -129,9 +128,9 @@ def vapor(query, bot, request_id, chat_id):
         for url in search_results:
             # check for video duration
             try:
-                info = youtube_dl.YoutubeDL(ydl_opts).extract_info(url,download = False)
+                info = yt_dlp.YoutubeDL(ydl_opts).extract_info(url, download=False)
             except Exception as e:
-                logger.error("[" + str(request_id) + "] " + e)
+                logger.error("[" + str(request_id) + "] " + str(e))
                 raise ValueError('Could not get information about video.')
             full_title = info['title']
             if (info['duration'] < MAX_DURATION and info['duration'] >= 5):
@@ -147,7 +146,7 @@ def vapor(query, bot, request_id, chat_id):
     else:
         logger.info("[" + str(request_id) + "] " + "Query was a YouTube URL.")
         url = query
-        info = youtube_dl.YoutubeDL(ydl_opts).extract_info(url,download = False)
+        info = yt_dlp.YoutubeDL(ydl_opts).extract_info(url, download=False)
         # check if video fits limit duration
         if (info['duration'] < 5 or info['duration'] > MAX_DURATION):
             raise ValueError('Video is too short. Need 5 seconds or more.')
@@ -164,17 +163,17 @@ def vapor(query, bot, request_id, chat_id):
         try:
             bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
         except Exception as e:
-            logger.error("[" + str(request_id) + "] " + e)
+            logger.error("[" + str(request_id) + "] " + str(e))
             raise ValueError('Failed to send audio.')
         return 
 
     # download video and extract audio
     logger.info("[" + str(request_id) + "] " + "Downloading video...")
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             ydl.download([url])
         except Exception as e:
-            logger.error("[" + str(request_id) + "] " + e)
+            logger.error("[" + str(request_id) + "] " + str(e))
             raise ValueError('Could not download ' + str(full_title) + '.')
 
     # find and extract music chorus
@@ -192,7 +191,7 @@ def vapor(query, bot, request_id, chat_id):
         try:
             song = AudioSegment.from_wav(original_path)
         except Exception as e:
-            logger.error("[" + str(request_id) + "] " + e)
+            logger.error("[" + str(request_id) + "] " + str(e))
             raise ValueError('Failed to get chorus audio segment.')
         
         # get the smallest possible segment
@@ -205,7 +204,7 @@ def vapor(query, bot, request_id, chat_id):
             first_seconds = song[:seconds]
             first_seconds.export(chorus_path, format="wav")
         except Exception as e:
-            logger.error("[" + str(request_id) + "] " + e)
+            logger.error("[" + str(request_id) + "] " + str(e))
             raise ValueError('Failed to export chorus audio segment.')
 
     # make it vaporwave (python wrapper for sox)
@@ -219,7 +218,7 @@ def vapor(query, bot, request_id, chat_id):
         logger.info("[" + str(request_id) + "] " + "Applying Vaporwave SFX...")
         fx(infile, outfile)
     except Exception as e:
-        logger.error("[" + str(request_id) + "] " + e)
+        logger.error("[" + str(request_id) + "] " + str(e))
         raise ValueError('Failed to apply Vaporwave SFX.')
     except:
         logger.error("[" + str(request_id) + "] " + "Unexpected error:", sys.exc_info()[0])
@@ -229,7 +228,7 @@ def vapor(query, bot, request_id, chat_id):
     try:
         bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
     except Exception as e:
-        logger.error("[" + str(request_id) + "] " + e)
+        logger.error("[" + str(request_id) + "] " + str(e))
         raise ValueError('Failed to send audio.')
 
     # cleanup
@@ -237,7 +236,7 @@ def vapor(query, bot, request_id, chat_id):
         os.remove(original_path)
         os.remove(chorus_path)
     except OSError as e:
-        logger.error("[" + str(request_id) + "] " + e)
+        logger.error("[" + str(request_id) + "] " + str(e))
         pass
 
 
@@ -266,7 +265,7 @@ def vapor_command(bot, update):
         start = timer()
         vapor(request_text, bot, request_id, chat_id)
     except ValueError as e:
-        logger.error("[" + str(request_id) + "] " + e)
+        logger.error("[" + str(request_id) + "] " + str(e))
         status = "failed"
         bot.send_message(chat_id=chat_id, text=error_str)
     finally:
