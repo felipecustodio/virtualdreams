@@ -11,7 +11,10 @@ import psutil
 import threading
 import time
 from functools import wraps
-from logzero import logger
+import logging
+
+# Get logger for memory management
+logger = logging.getLogger('virtualdreams.memory')
 
 
 class MemoryMonitor:
@@ -30,20 +33,20 @@ class MemoryMonitor:
         """Monitor memory usage of a function call."""
         try:
             initial_memory = self.get_memory_usage_mb()
-            logger.debug(f"Initial memory usage: {initial_memory:.2f} MB")
+            logger.debug("Initial memory usage: %.2f MB", initial_memory)
             
             result = func(*args, **kwargs)
             result_container['result'] = result
             result_container['success'] = True
             
             final_memory = self.get_memory_usage_mb()
-            logger.debug(f"Final memory usage: {final_memory:.2f} MB")
-            logger.debug(f"Memory delta: {final_memory - initial_memory:.2f} MB")
+            logger.debug("Final memory usage: %.2f MB", final_memory)
+            logger.debug("Memory delta: %.2f MB", final_memory - initial_memory)
             
         except Exception as e:
             result_container['error'] = str(e)
             result_container['success'] = False
-            logger.error(f"Function execution failed: {e}")
+            logger.error("Function execution failed: %s", str(e))
         finally:
             # Force garbage collection
             gc.collect()
@@ -71,19 +74,19 @@ class MemoryMonitor:
                 
                 # Check memory limit
                 if current_memory > self.max_memory_mb:
-                    logger.warning(f"Memory limit exceeded: {current_memory:.2f} MB > {self.max_memory_mb} MB")
+                    logger.warning("Memory limit exceeded: %.2f MB > %d MB", current_memory, self.max_memory_mb)
                     # Force garbage collection
                     gc.collect()
                     # Give one more chance
                     time.sleep(1)
                     current_memory = self.get_memory_usage_mb()
                     if current_memory > self.max_memory_mb:
-                        logger.error(f"Memory limit still exceeded after GC: {current_memory:.2f} MB")
+                        logger.error("Memory limit still exceeded after GC: %.2f MB", current_memory)
                         raise MemoryError(f"Memory usage exceeded limit: {current_memory:.2f} MB > {self.max_memory_mb} MB")
                 
                 # Check timeout
                 if elapsed_time > self.timeout_seconds:
-                    logger.error(f"Timeout exceeded: {elapsed_time:.2f}s > {self.timeout_seconds}s")
+                    logger.error("Timeout exceeded: %.2f s > %d s", elapsed_time, self.timeout_seconds)
                     raise TimeoutError(f"Function execution timeout after {elapsed_time:.2f} seconds")
                 
                 time.sleep(0.1)  # Check every 100ms
@@ -110,5 +113,5 @@ def log_memory_usage(stage_name):
     """Log current memory usage for debugging."""
     process = psutil.Process()
     memory_mb = process.memory_info().rss / 1024 / 1024
-    logger.info(f"Memory usage at {stage_name}: {memory_mb:.2f} MB")
+    logger.info("Memory usage at %s: %.2f MB", stage_name, memory_mb)
     return memory_mb
