@@ -1,0 +1,8 @@
+pychorus==0.1
+yt-dlp
+emoji>=2.0.0
+python-telegram-bot>=20.0
+pydub==0.23.0
+pysndfx==0.3.6
+logzero==1.5.0
+python-dotenv>=1.0.0
