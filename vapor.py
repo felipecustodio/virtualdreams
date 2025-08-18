@@ -33,12 +33,58 @@ import urllib.parse
 import youtube_dl
 
 # logging
-import logzero
-from logzero import logger
-from logzero import setup_logger
+import logging
+import logging.handlers
 
-logzero.logfile("log.log", maxBytes=1e6, backupCount=5)
-stats = setup_logger(name="stats", logfile="requests.log", level=logging.INFO, maxBytes=1e6, backupCount=5)
+def setup_logging():
+    """Configure modern logging for the application."""
+    # Create formatters
+    detailed_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    stats_formatter = logging.Formatter('%(message)s')
+    
+    # Configure main logger
+    logger = logging.getLogger('virtualdreams')
+    logger.setLevel(logging.DEBUG)
+    
+    # Main log file handler with rotation
+    main_handler = logging.handlers.RotatingFileHandler(
+        'log.log', maxBytes=int(1e6), backupCount=5
+    )
+    main_handler.setFormatter(detailed_formatter)
+    main_handler.setLevel(logging.DEBUG)
+    
+    # Console handler for development
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(detailed_formatter)
+    console_handler.setLevel(logging.INFO)
+    
+    # Add handlers to main logger
+    logger.addHandler(main_handler)
+    logger.addHandler(console_handler)
+    
+    # Configure stats logger
+    stats_logger = logging.getLogger('virtualdreams.stats')
+    stats_logger.setLevel(logging.INFO)
+    
+    # Stats log file handler with rotation
+    stats_handler = logging.handlers.RotatingFileHandler(
+        'requests.log', maxBytes=int(1e6), backupCount=5
+    )
+    stats_handler.setFormatter(stats_formatter)
+    stats_handler.setLevel(logging.INFO)
+    
+    # Add handler to stats logger and prevent propagation to avoid duplicate logs
+    stats_logger.addHandler(stats_handler)
+    stats_logger.propagate = False
+    
+    return logger, stats_logger
+
+# Initialize loggers
+logger, stats = setup_logging()
 
 # vaporwave parameters
 fx = (
@@ -98,26 +144,27 @@ def vapor(query, bot, request_id, chat_id):
         }],
     }
 
-    logger.info("[" + str(request_id) + "] " + "Got request!")
-    logger.debug("[" + str(request_id) + "] " + str(query) + " " + str(chat_id))
+    logger.info("[%s] Got request!", request_id)
+    logger.debug("[%s] Query: %s, Chat ID: %s", request_id, query, chat_id)
 
     # prepare audio files paths (for all systems)
-    logger.info("[" + str(request_id) + "] " + "Preparing audio paths...")
+    logger.info("[%s] Preparing audio paths...", request_id)
     original_path = str(request_id) + ".wav"
     chorus_path = str(request_id) + "_chorus.wav"
     vapor_path = str(request_id) + "_vapor.wav"
-    logger.debug("[" + str(request_id) + "] " + " " + str(original_path) + " " + str(chorus_path) + " " + str(vapor_path))
+    logger.debug("[%s] Audio paths - Original: %s, Chorus: %s, Vapor: %s", 
+                request_id, original_path, chorus_path, vapor_path)
 
-    logger.info("[" + str(request_id) + "] " + "Sending 'Working' message to " + str(chat_id) + '...')
+    logger.info("[%s] Sending 'Working' message to %s...", request_id, chat_id)
     try:
         bot.send_message(chat_id=chat_id, text=working_str)
     except Exception as e:
-        logger.error("[" + str(request_id) + "] " + e)
+        logger.error("[%s] Failed to send message: %s", request_id, str(e))
         raise ValueError('Could not send message to user ' + str(chat_id))
 
     # check if query is youtube url
     if not query.lower().startswith((youtube_urls)):
-        logger.info("[" + str(request_id) + "] " + "Searching for YouTube videos...")
+        logger.info("[%s] Searching for YouTube videos...", request_id)
         # search for youtube videos matching query
         query_string = urllib.parse.urlencode({"search_query" : query})
         html_content = urllib.request.urlopen("http://www.youtube.com/results?" + query_string)
@@ -125,18 +172,18 @@ def vapor(query, bot, request_id, chat_id):
         info = False
 
         # find video that fits max duration
-        logger.info("[" + str(request_id) + "] " + "Get video information...")
+        logger.info("[%s] Getting video information...", request_id)
         for url in search_results:
             # check for video duration
             try:
                 info = youtube_dl.YoutubeDL(ydl_opts).extract_info(url,download = False)
             except Exception as e:
-                logger.error("[" + str(request_id) + "] " + e)
+                logger.error("[%s] Could not get video information: %s", request_id, str(e))
                 raise ValueError('Could not get information about video.')
             full_title = info['title']
             if (info['duration'] < MAX_DURATION and info['duration'] >= 5):
                 # get first video that fits the limit duration
-                logger.debug("[" + str(request_id) + "] " + "Got video: " + str(full_title))
+                logger.debug("[%s] Found suitable video: %s", request_id, full_title)
                 break
         
         # if we ran out of urls, return error
@@ -145,7 +192,7 @@ def vapor(query, bot, request_id, chat_id):
 
     # query was a youtube link
     else:
-        logger.info("[" + str(request_id) + "] " + "Query was a YouTube URL.")
+        logger.info("[%s] Query was a YouTube URL", request_id)
         url = query
         info = youtube_dl.YoutubeDL(ydl_opts).extract_info(url,download = False)
         # check if video fits limit duration
@@ -157,28 +204,28 @@ def vapor(query, bot, request_id, chat_id):
     title = str((title.encode('ascii',errors='ignore')).decode())
 
     # check if cached audio exists
-    logger.info("[" + str(request_id) + "] " + "Checking if cached audio exists...")
+    logger.info("[%s] Checking if cached audio exists...", request_id)
     vapor_path = title + "_vapor.wav"
     if Path(vapor_path).is_file():
         vapor_path = title + "_vapor.wav"
         try:
             bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
         except Exception as e:
-            logger.error("[" + str(request_id) + "] " + e)
+            logger.error("[%s] Failed to send cached audio: %s", request_id, str(e))
             raise ValueError('Failed to send audio.')
         return 
 
     # download video and extract audio
-    logger.info("[" + str(request_id) + "] " + "Downloading video...")
+    logger.info("[%s] Downloading video...", request_id)
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         try:
             ydl.download([url])
         except Exception as e:
-            logger.error("[" + str(request_id) + "] " + e)
+            logger.error("[%s] Could not download video: %s", request_id, str(e))
             raise ValueError('Could not download ' + str(full_title) + '.')
 
     # find and extract music chorus
-    logger.info("[" + str(request_id) + "] " + "Searching for chorus...")
+    logger.info("[%s] Searching for chorus...", request_id)
     chorus = False
     chorus_duration = 15 # anything bigger would consume too much memory
     while (not chorus and chorus_duration > 0):
@@ -186,13 +233,13 @@ def vapor(query, bot, request_id, chat_id):
         chorus_duration -= 5
     
     if (not chorus):
-        logger.info("[" + str(request_id) + "] " + "Could not find chorus, using first segment...")
+        logger.info("[%s] Could not find chorus, using first segment...", request_id)
         # could not find chorus, use first seconds instead
         chorus_duration = 15 # reset durations
         try:
             song = AudioSegment.from_wav(original_path)
         except Exception as e:
-            logger.error("[" + str(request_id) + "] " + e)
+            logger.error("[%s] Failed to load audio segment: %s", request_id, str(e))
             raise ValueError('Failed to get chorus audio segment.')
         
         # get the smallest possible segment
@@ -205,7 +252,7 @@ def vapor(query, bot, request_id, chat_id):
             first_seconds = song[:seconds]
             first_seconds.export(chorus_path, format="wav")
         except Exception as e:
-            logger.error("[" + str(request_id) + "] " + e)
+            logger.error("[%s] Failed to export audio segment: %s", request_id, str(e))
             raise ValueError('Failed to export chorus audio segment.')
 
     # make it vaporwave (python wrapper for sox)
@@ -214,22 +261,22 @@ def vapor(query, bot, request_id, chat_id):
     infile = str(chorus_path)
     outfile = str(vapor_path)
 
-    logger.debug("[" + str(request_id) + "] " + str(infile) + " " + str(outfile))
+    logger.debug("[%s] Processing audio - Input: %s, Output: %s", request_id, infile, outfile)
     try:
-        logger.info("[" + str(request_id) + "] " + "Applying Vaporwave SFX...")
+        logger.info("[%s] Applying Vaporwave SFX...", request_id)
         fx(infile, outfile)
     except Exception as e:
-        logger.error("[" + str(request_id) + "] " + e)
+        logger.error("[%s] Failed to apply Vaporwave SFX: %s", request_id, str(e))
         raise ValueError('Failed to apply Vaporwave SFX.')
     except:
-        logger.error("[" + str(request_id) + "] " + "Unexpected error:", sys.exc_info()[0])
+        logger.error("[%s] Unexpected error during SFX processing: %s", request_id, sys.exc_info()[0])
 
     # send audio to user
-    logger.info("[" + str(request_id) + "] " + 'Sending final audio to ' + str(chat_id) + '...')
+    logger.info("[%s] Sending final audio to %s...", request_id, chat_id)
     try:
         bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
     except Exception as e:
-        logger.error("[" + str(request_id) + "] " + e)
+        logger.error("[%s] Failed to send final audio: %s", request_id, str(e))
         raise ValueError('Failed to send audio.')
 
     # cleanup
@@ -237,7 +284,7 @@ def vapor(query, bot, request_id, chat_id):
         os.remove(original_path)
         os.remove(chorus_path)
     except OSError as e:
-        logger.error("[" + str(request_id) + "] " + e)
+        logger.error("[%s] Failed to cleanup temporary files: %s", request_id, str(e))
         pass
 
 
@@ -266,14 +313,14 @@ def vapor_command(bot, update):
         start = timer()
         vapor(request_text, bot, request_id, chat_id)
     except ValueError as e:
-        logger.error("[" + str(request_id) + "] " + e)
+        logger.error("[%s] Request failed: %s", request_id, str(e))
         status = "failed"
         bot.send_message(chat_id=chat_id, text=error_str)
     finally:
         end = timer()
         elapsed = str(end - start)
-        logger.info("[" + str(request_id) + "] " + "Finished.")
-        stats.info("{},{},{},{},{},{}".format(request_date, str(request_id), str(username), str(request_text), str(status), str(elapsed)))
+        logger.info("[%s] Request finished", request_id)
+        stats.info("%s,%s,%s,%s,%s,%s", request_date, str(request_id), str(username), str(request_text), str(status), str(elapsed))
 
 
 @run_async
@@ -313,7 +360,7 @@ def main():
             os.makedirs("cache")
             os.chdir("cache")
         except OSError as e:
-            logger.error(e)
+            logger.error("Failed to create or change to cache directory: %s", str(e))
     else:
         os.chdir("cache")
 
