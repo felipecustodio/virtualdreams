@@ -5,3 +5,4 @@ backup/
 *.wav
 *.mp3
 *.bundle
+__pycache__/
