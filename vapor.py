@@ -96,6 +96,19 @@ def safe_find_chorus(original_path, chorus_path, duration, request_id):
     log_memory_usage(f"[{request_id}] before_chorus_detection")
     
     try:
+        # Check if input file exists and is readable
+        if not os.path.exists(original_path):
+            logger.error(f"[{request_id}] Input file does not exist: {original_path}")
+            return False
+            
+        file_size = os.path.getsize(original_path) / (1024 * 1024)  # Size in MB
+        logger.info(f"[{request_id}] Processing audio file of size: {file_size:.2f} MB")
+        
+        # Skip chorus detection for very large files to prevent memory issues
+        if file_size > 50:  # Skip for files larger than 50MB
+            logger.warning(f"[{request_id}] File too large ({file_size:.2f} MB), skipping chorus detection")
+            return False
+        
         # Wrap the pychorus function with memory monitoring
         @memory_monitor.with_memory_limit
         def monitored_find_chorus():
@@ -106,6 +119,11 @@ def safe_find_chorus(original_path, chorus_path, duration, request_id):
         
         log_memory_usage(f"[{request_id}] after_chorus_detection")
         logger.info(f"[{request_id}] Chorus detection completed successfully: {result}")
+        
+        # Verify output file was created if result is True
+        if result and not os.path.exists(chorus_path):
+            logger.warning(f"[{request_id}] Chorus detection returned True but no output file created")
+            result = False
         
         # Force cleanup after chorus detection
         cleanup_memory()
