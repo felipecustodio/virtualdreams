@@ -26,6 +26,24 @@ This document explains how to run the Virtual Dreams Telegram bot using Docker.
    docker-compose up --build
    ```
 
+## Testing the Setup
+
+Before running the bot, you can test that all dependencies are working:
+
+```bash
+# Test the Docker setup
+python test_setup.py
+
+# Or test inside the container
+docker run --rm virtualdreams python test_setup.py
+```
+
+The test verifies:
+- ✅ All Python packages can be imported
+- ✅ System audio tools (sox, ffmpeg) are available
+- ✅ File operations work in cache directory
+- ✅ Redis connection (when available)
+
 ## Services
 
 The Docker setup includes:
@@ -45,6 +63,12 @@ The caching system automatically:
 - Falls back to file cache if Redis is unavailable
 - Stores newly processed audio in both Redis and file cache
 - Gracefully handles Redis connection issues
+
+### Audio Processing
+- Downloads audio from YouTube using youtube-dl
+- Processes audio with vaporwave effects using sox
+- Supports videos between 5 seconds and 7 minutes
+- Automatic chorus detection and extraction
 
 ## Configuration
 
@@ -88,5 +112,29 @@ For production deployment:
 
 - Check logs: `docker-compose logs virtualdreams`
 - Check Redis: `docker-compose logs redis`
+- Test setup: `python test_setup.py`
 - Restart services: `docker-compose restart`
 - Clean rebuild: `docker-compose down && docker-compose up --build`
+
+## Architecture
+
+```
+┌─────────────────┐    ┌──────────────┐
+│  Telegram Bot   │    │    Redis     │
+│  (virtualdreams)│◄──►│   (cache)    │
+│                 │    │              │
+│ • Audio proc.   │    │ • 7-day TTL  │
+│ • YouTube DL    │    │ • Fallback   │
+│ • Sox effects   │    │ • Distribute │
+└─────────────────┘    └──────────────┘
+         │
+         ▼
+┌─────────────────┐
+│   File System   │
+│     (cache)     │
+│                 │
+│ • Local files   │
+│ • Temp audio    │
+│ • Logs          │
+└─────────────────┘
+```
