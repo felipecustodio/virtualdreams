@@ -23,7 +23,6 @@ from telegram.ext.dispatcher import run_async
 from telegram import InlineQueryResultArticle, InputTextMessageContent, ChatAction
 from emoji import emojize
 # audio manipulation
-from pysndfx import AudioEffectsChain
 from pydub import AudioSegment
 from pychorus import find_and_output_chorus
 # youtube
@@ -40,20 +39,54 @@ from logzero import setup_logger
 logzero.logfile("log.log", maxBytes=1e6, backupCount=5)
 stats = setup_logger(name="stats", logfile="requests.log", level=logging.INFO, maxBytes=1e6, backupCount=5)
 
-# vaporwave parameters
-fx = (
-        AudioEffectsChain()
-        .speed(0.63)
-        .reverb(
-               reverberance=100,
-               hf_damping=50,
-               room_scale=100,
-               stereo_depth=100,
-               pre_delay=20,
-               wet_gain=0,
-               wet_only=False
-               )
-    )
+# Pure Python audio effects as replacement for sox/pysndfx
+def apply_vaporwave_effects(input_path, output_path, speed_factor=0.63):
+    """
+    Apply vaporwave effects (speed and reverb) using pure Python/pydub
+    
+    Args:
+        input_path: Path to input audio file
+        output_path: Path to output audio file  
+        speed_factor: Speed multiplier (0.63 for vaporwave effect)
+    """
+    # Load audio
+    audio = AudioSegment.from_wav(input_path)
+    
+    # Apply speed change
+    # To slow down by speed_factor, reduce frame rate by that factor
+    new_sample_rate = int(audio.frame_rate * speed_factor)
+    slow_audio = audio._spawn(audio.raw_data, overrides={'frame_rate': new_sample_rate})
+    slow_audio = slow_audio.set_frame_rate(audio.frame_rate)
+    
+    # Apply simple reverb effect
+    reverb_audio = apply_reverb(slow_audio)
+    
+    # Export result
+    reverb_audio.export(output_path, format="wav")
+    
+def apply_reverb(audio, delays=[50, 100, 150, 200], decay_db=6):
+    """
+    Apply a simple reverb effect using multiple delayed copies
+    
+    Args:
+        audio: AudioSegment to apply reverb to
+        delays: List of delay times in milliseconds
+        decay_db: Volume reduction per delay in dB
+    """
+    result = audio
+    
+    for i, delay in enumerate(delays):
+        # Create delayed version
+        delayed = AudioSegment.silent(duration=delay) + audio
+        # Trim to original length to avoid extending duration
+        delayed = delayed[:len(audio)]
+        # Reduce volume for each delay (reverb decay)
+        volume_reduction = (i + 1) * decay_db
+        delayed = delayed - volume_reduction
+        # Mix with result
+        result = result.overlay(delayed)
+    
+    return result
 
 # video duration limit
 MAX_DURATION = 420  # seconds (7 minutes)
@@ -80,7 +113,7 @@ def vapor(query, bot, request_id, chat_id):
     duration under the limit, download video with youtube_dl
     and extract .wav audio with ffmpeg. Extract chorus using
     pychorus. If it fails, try smaller chorus' times.
-    Using sox, slow down and apply reverb. 
+    Using pure Python/pydub, slow down and apply reverb. 
     Return vaporwaved audio.
 
     Query can be YouTube link. 
@@ -208,7 +241,7 @@ def vapor(query, bot, request_id, chat_id):
             logger.error("[" + str(request_id) + "] " + e)
             raise ValueError('Failed to export chorus audio segment.')
 
-    # make it vaporwave (python wrapper for sox)
+    # make it vaporwave (pure python effects)
     vapor_path = str(title) + "_vapor.wav"
     
     infile = str(chorus_path)
@@ -217,7 +250,7 @@ def vapor(query, bot, request_id, chat_id):
     logger.debug("[" + str(request_id) + "] " + str(infile) + " " + str(outfile))
     try:
         logger.info("[" + str(request_id) + "] " + "Applying Vaporwave SFX...")
-        fx(infile, outfile)
+        apply_vaporwave_effects(infile, outfile)
     except Exception as e:
         logger.error("[" + str(request_id) + "] " + e)
         raise ValueError('Failed to apply Vaporwave SFX.')
