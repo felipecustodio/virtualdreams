@@ -58,6 +58,11 @@ fx = (
 # video duration limit
 MAX_DURATION = 420  # seconds (7 minutes)
 
+# remix duration limits
+STANDARD_CHORUS_DURATION = 15  # seconds (original behavior)
+REMIX_CHORUS_DURATION = 60     # seconds (for full remixes)
+REMIX_REPEAT_COUNT = 4         # how many times to repeat the chorus for remix
+
 # youtube urls for query parsing
 youtube_urls = ('youtube.com', 'https://www.youtube.com/', 'http://www.youtube.com/', 'http://youtu.be/', 'https://youtu.be/', 'youtu.be')
 
@@ -69,11 +74,12 @@ emoji_cd = emojize(":cd:", use_aliases=True)
 # bot messages
 error_str = emoji_cd + " ＥＲＲＯＲ.\nSomething went wrong!\nAn error has occurred or a song name or link wasn't provided.\nPlease try again!"
 working_str = emoji_palm_tree + " ＷＯＲＫＩＮＧ．．．\nThis can take up a bit more than a minute. Sit back and relax. If you don't hear back from me, try again!"
-help_str = emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\"\n" + emoji_video_camera + " /vapor YouTube URL.\n\nWorks with videos between 5 seconds and 7 minutes.\n\nIf your request is taking too long, please try again.\n"
+working_remix_str = emoji_palm_tree + " ＣＲＥＡＴＩＮＧ ＲＥＭＩＸ．．．\nGenerating a full remix... This may take several minutes. Please be patient!"
+help_str = emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\" - Quick 15s vaporwave\n" + emoji_cd + " /remix \"song name\" - Full remix (longer)\n" + emoji_video_camera + " /vapor or /remix YouTube URL\n\nWorks with videos between 5 seconds and 7 minutes.\n\nIf your request is taking too long, please try again.\n"
 unknown_str = emoji_cd + " ＥＲＲＯＲ.\nThis is not a valid command. Use /help to find out more."
 
 
-def vapor(query, bot, request_id, chat_id):
+def vapor(query, bot, request_id, chat_id, remix_mode=False):
     """Returns audio to the vapor command handler
 
     Searches YouTube for 'query', finds first match that has
@@ -83,7 +89,9 @@ def vapor(query, bot, request_id, chat_id):
     Using sox, slow down and apply reverb. 
     Return vaporwaved audio.
 
-    Query can be YouTube link. 
+    Query can be YouTube link.
+    If remix_mode is True, creates longer remixes by using longer
+    segments and repeating them.
     """
     ydl_opts = {
         'quiet': 'True',
@@ -110,7 +118,8 @@ def vapor(query, bot, request_id, chat_id):
 
     logger.info("[" + str(request_id) + "] " + "Sending 'Working' message to " + str(chat_id) + '...')
     try:
-        bot.send_message(chat_id=chat_id, text=working_str)
+        message_text = working_remix_str if remix_mode else working_str
+        bot.send_message(chat_id=chat_id, text=message_text)
     except Exception as e:
         logger.error("[" + str(request_id) + "] " + e)
         raise ValueError('Could not send message to user ' + str(chat_id))
@@ -158,15 +167,15 @@ def vapor(query, bot, request_id, chat_id):
 
     # check if cached audio exists
     logger.info("[" + str(request_id) + "] " + "Checking if cached audio exists...")
-    vapor_path = title + "_vapor.wav"
+    suffix = "_remix" if remix_mode else "_vapor"
+    vapor_path = title + suffix + ".wav"
     if Path(vapor_path).is_file():
-        vapor_path = title + "_vapor.wav"
         try:
             bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
         except Exception as e:
             logger.error("[" + str(request_id) + "] " + e)
             raise ValueError('Failed to send audio.')
-        return 
+        return
 
     # download video and extract audio
     logger.info("[" + str(request_id) + "] " + "Downloading video...")
@@ -180,15 +189,18 @@ def vapor(query, bot, request_id, chat_id):
     # find and extract music chorus
     logger.info("[" + str(request_id) + "] " + "Searching for chorus...")
     chorus = False
-    chorus_duration = 15 # anything bigger would consume too much memory
+    # Set chorus duration based on mode
+    initial_chorus_duration = REMIX_CHORUS_DURATION if remix_mode else STANDARD_CHORUS_DURATION
+    chorus_duration = initial_chorus_duration
+    
     while (not chorus and chorus_duration > 0):
-        chorus = find_and_output_chorus(original_path, chorus_path, 15)
+        chorus = find_and_output_chorus(original_path, chorus_path, chorus_duration)
         chorus_duration -= 5
     
     if (not chorus):
         logger.info("[" + str(request_id) + "] " + "Could not find chorus, using first segment...")
         # could not find chorus, use first seconds instead
-        chorus_duration = 15 # reset durations
+        chorus_duration = initial_chorus_duration # reset to initial duration
         try:
             song = AudioSegment.from_wav(original_path)
         except Exception as e:
@@ -203,13 +215,36 @@ def vapor(query, bot, request_id, chat_id):
         try:
             seconds = chorus_duration * 1000
             first_seconds = song[:seconds]
-            first_seconds.export(chorus_path, format="wav")
+            
+            # For remix mode, repeat the segment to create longer output
+            if remix_mode:
+                logger.info("[" + str(request_id) + "] " + "Creating extended remix...")
+                extended_audio = first_seconds
+                for i in range(REMIX_REPEAT_COUNT - 1):
+                    extended_audio += first_seconds
+                extended_audio.export(chorus_path, format="wav")
+            else:
+                first_seconds.export(chorus_path, format="wav")
         except Exception as e:
             logger.error("[" + str(request_id) + "] " + e)
             raise ValueError('Failed to export chorus audio segment.')
+    else:
+        # Chorus was found, extend it if in remix mode
+        if remix_mode:
+            try:
+                logger.info("[" + str(request_id) + "] " + "Extending found chorus for remix...")
+                chorus_audio = AudioSegment.from_wav(chorus_path)
+                extended_chorus = chorus_audio
+                for i in range(REMIX_REPEAT_COUNT - 1):
+                    extended_chorus += chorus_audio
+                extended_chorus.export(chorus_path, format="wav")
+            except Exception as e:
+                logger.error("[" + str(request_id) + "] " + e)
+                raise ValueError('Failed to extend chorus for remix.')
 
     # make it vaporwave (python wrapper for sox)
-    vapor_path = str(title) + "_vapor.wav"
+    suffix = "_remix" if remix_mode else "_vapor"
+    vapor_path = str(title) + suffix + ".wav"
     
     infile = str(chorus_path)
     outfile = str(vapor_path)
@@ -277,6 +312,34 @@ def vapor_command(bot, update):
 
 
 @run_async
+def remix_command(bot, update):
+    """ /remix - Request handler for full remixes """
+    request_date = time.strftime("%Y%m%d-%H%M%S")
+
+    request_id = update.message.message_id
+    username = str(bytes(str(update.message.from_user.username), 'utf-8').decode('utf-8', 'ignore'))
+   
+    request_text = update.message.text.replace('/remix ','')
+    request_text = str(bytes(str(request_text), 'utf-8').decode('utf-8', 'ignore'))
+
+    chat_id = update.message.chat_id
+    status = "success"
+
+    try:
+        start = timer()
+        vapor(request_text, bot, request_id, chat_id, remix_mode=True)
+    except ValueError as e:
+        logger.error("[" + str(request_id) + "] " + e)
+        status = "failed"
+        bot.send_message(chat_id=chat_id, text=error_str)
+    finally:
+        end = timer()
+        elapsed = str(end - start)
+        logger.info("[" + str(request_id) + "] " + "Finished.")
+        stats.info("{},{},{},{},{},{}".format(request_date, str(request_id), str(username), str(request_text), str(status), str(elapsed)))
+
+
+@run_async
 def unknown_command(bot, update):
     bot.send_message(chat_id=update.message.chat_id, text=unknown_str)
 
@@ -297,6 +360,7 @@ def main():
     help_handler = CommandHandler('help', help_command)
     start_handler = CommandHandler('start', help_command)
     vapor_handler = CommandHandler('vapor', vapor_command)
+    remix_handler = CommandHandler('remix', remix_command)
     unknown_handler = MessageHandler(Filters.command, unknown_command)
 
     # start bot handlers
@@ -304,6 +368,7 @@ def main():
     dispatcher.add_handler(start_handler)
     dispatcher.add_handler(help_handler)
     dispatcher.add_handler(vapor_handler)
+    dispatcher.add_handler(remix_handler)
     dispatcher.add_handler(unknown_handler)
 
     # move working directory to cache
