@@ -1,0 +1,5 @@
+# Current version (legacy API + yt-dlp upgrade)
+web: python vapor.py
+
+# Modern async version (uncomment when ready to use modern requirements)
+# web: python vapor_modern.py
