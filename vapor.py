@@ -37,8 +37,14 @@ import logzero
 from logzero import logger
 from logzero import setup_logger
 
+# modern caching
+from cache_manager import CacheManager
+
 logzero.logfile("log.log", maxBytes=1e6, backupCount=5)
 stats = setup_logger(name="stats", logfile="requests.log", level=logging.INFO, maxBytes=1e6, backupCount=5)
+
+# global cache manager instance
+cache_manager = None
 
 # vaporwave parameters
 fx = (
@@ -69,7 +75,7 @@ emoji_cd = emojize(":cd:", use_aliases=True)
 # bot messages
 error_str = emoji_cd + " ＥＲＲＯＲ.\nSomething went wrong!\nAn error has occurred or a song name or link wasn't provided.\nPlease try again!"
 working_str = emoji_palm_tree + " ＷＯＲＫＩＮＧ．．．\nThis can take up a bit more than a minute. Sit back and relax. If you don't hear back from me, try again!"
-help_str = emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\"\n" + emoji_video_camera + " /vapor YouTube URL.\n\nWorks with videos between 5 seconds and 7 minutes.\n\nIf your request is taking too long, please try again.\n"
+help_str = emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\"\n" + emoji_video_camera + " /vapor YouTube URL\n📊 /stats - View cache statistics\n\nWorks with videos between 5 seconds and 7 minutes.\n\nIf your request is taking too long, please try again.\n"
 unknown_str = emoji_cd + " ＥＲＲＯＲ.\nThis is not a valid command. Use /help to find out more."
 
 
@@ -152,20 +158,20 @@ def vapor(query, bot, request_id, chat_id):
         if (info['duration'] < 5 or info['duration'] > MAX_DURATION):
             raise ValueError('Video is too short. Need 5 seconds or more.')
 
-    # cleanup title
+    # cleanup title for logging
     title = (re.sub(r'\W+', '', info['title']))[:15]
     title = str((title.encode('ascii',errors='ignore')).decode())
 
-    # check if cached audio exists
-    logger.info("[" + str(request_id) + "] " + "Checking if cached audio exists...")
-    vapor_path = title + "_vapor.wav"
-    if Path(vapor_path).is_file():
-        vapor_path = title + "_vapor.wav"
+    # check if cached audio exists using modern cache manager
+    logger.info("[" + str(request_id) + "] " + "Checking cache for audio...")
+    cached_audio_path = cache_manager.get_cached_audio(url, title)
+    if cached_audio_path and cached_audio_path.exists():
         try:
-            bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
+            bot.send_audio(chat_id=chat_id, audio=open(cached_audio_path, 'rb'))
+            logger.info("[" + str(request_id) + "] " + "Sent cached audio successfully")
         except Exception as e:
-            logger.error("[" + str(request_id) + "] " + e)
-            raise ValueError('Failed to send audio.')
+            logger.error("[" + str(request_id) + "] " + str(e))
+            raise ValueError('Failed to send cached audio.')
         return 
 
     # download video and extract audio
@@ -219,25 +225,35 @@ def vapor(query, bot, request_id, chat_id):
         logger.info("[" + str(request_id) + "] " + "Applying Vaporwave SFX...")
         fx(infile, outfile)
     except Exception as e:
-        logger.error("[" + str(request_id) + "] " + e)
+        logger.error("[" + str(request_id) + "] " + str(e))
         raise ValueError('Failed to apply Vaporwave SFX.')
     except:
         logger.error("[" + str(request_id) + "] " + "Unexpected error:", sys.exc_info()[0])
+
+    # store in cache using modern cache manager
+    try:
+        cache_key = cache_manager.store_audio(url, outfile, title)
+        logger.info("[" + str(request_id) + "] " + f"Stored audio in cache with key: {cache_key}")
+    except Exception as e:
+        logger.warning("[" + str(request_id) + "] " + f"Failed to cache audio: {e}")
 
     # send audio to user
     logger.info("[" + str(request_id) + "] " + 'Sending final audio to ' + str(chat_id) + '...')
     try:
         bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
     except Exception as e:
-        logger.error("[" + str(request_id) + "] " + e)
+        logger.error("[" + str(request_id) + "] " + str(e))
         raise ValueError('Failed to send audio.')
 
-    # cleanup
+    # cleanup temporary files (but keep cached version)
     try:
         os.remove(original_path)
         os.remove(chorus_path)
+        # Remove the temporary vapor file since it's now cached
+        if Path(vapor_path).exists():
+            os.remove(vapor_path)
     except OSError as e:
-        logger.error("[" + str(request_id) + "] " + e)
+        logger.error("[" + str(request_id) + "] " + str(e))
         pass
 
 
@@ -246,6 +262,28 @@ def vapor(query, bot, request_id, chat_id):
 def help_command(bot, update):
     """ /help - Shows usage """
     bot.send_message(chat_id=update.message.chat_id, text=help_str)
+
+
+@run_async
+def stats_command(bot, update):
+    """ /stats - Shows cache statistics """
+    try:
+        stats = cache_manager.get_cache_stats()
+        stats_text = (
+            f"📊 **Cache Statistics**\n\n"
+            f"🗃️ **Files**: {stats['total_files']}\n"
+            f"💾 **Size**: {stats['total_size_mb']} / {stats['max_size_mb']} MB\n"
+            f"🎯 **Hit Rate**: {stats['hit_rate_percent']}%\n"
+            f"✅ **Hits**: {stats['hits']}\n"
+            f"❌ **Misses**: {stats['misses']}\n"
+            f"🔄 **Evictions**: {stats['evictions']}\n"
+            f"🧠 **Memory Cache**: {stats['memory_cache_size']} items\n"
+            f"🔗 **Redis**: {'✅ Available' if stats['redis_available'] else '❌ Not Available'}"
+        )
+        bot.send_message(chat_id=update.message.chat_id, text=stats_text, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Failed to get cache stats: {e}")
+        bot.send_message(chat_id=update.message.chat_id, text="❌ Failed to retrieve cache statistics")
 
 
 @run_async
@@ -282,12 +320,29 @@ def unknown_command(bot, update):
 
 
 def main():
+    global cache_manager
+    
     # set env variables
     logger.info("VIRTUAL DREAMS TURNING ON...")
     load_dotenv()
     BOT_TOKEN = os.getenv("TOKEN")
     HEROKU_NAME = "virtualdreamsbot"
     PORT = int(os.environ.get('PORT', '8443'))
+    
+    # initialize modern cache manager
+    redis_url = os.getenv("REDIS_URL")
+    cache_dir = os.getenv("CACHE_DIR", "cache")
+    max_cache_size_mb = int(os.getenv("CACHE_SIZE_MB", "500"))
+    cache_ttl_days = int(os.getenv("CACHE_TTL_DAYS", "7"))
+    
+    logger.info("Initializing modern cache manager...")
+    cache_manager = CacheManager(
+        cache_dir=cache_dir,
+        redis_url=redis_url,
+        max_cache_size_mb=max_cache_size_mb,
+        default_ttl=cache_ttl_days * 24 * 3600,
+        memory_cache_size=100
+    )
 
     logger.info("Dispatching workers...")
     updater = Updater(token=BOT_TOKEN, workers=2)
@@ -297,6 +352,7 @@ def main():
     help_handler = CommandHandler('help', help_command)
     start_handler = CommandHandler('start', help_command)
     vapor_handler = CommandHandler('vapor', vapor_command)
+    stats_handler = CommandHandler('stats', stats_command)
     unknown_handler = MessageHandler(Filters.command, unknown_command)
 
     # start bot handlers
@@ -304,18 +360,19 @@ def main():
     dispatcher.add_handler(start_handler)
     dispatcher.add_handler(help_handler)
     dispatcher.add_handler(vapor_handler)
+    dispatcher.add_handler(stats_handler)
     dispatcher.add_handler(unknown_handler)
 
-    # move working directory to cache
+    # ensure cache directory exists and set working directory
     logger.info("Setting working directory...")
-    if not os.path.exists("cache") and not (str(os.path.basename(os.getcwd())) == "cache"):
+    if not os.path.exists(cache_dir):
         try:
-            os.makedirs("cache")
-            os.chdir("cache")
+            os.makedirs(cache_dir)
         except OSError as e:
             logger.error(e)
-    else:
-        os.chdir("cache")
+    
+    # Set working directory to cache directory for temporary files
+    os.chdir(cache_dir)
 
     # heroku webhook
     updater.start_webhook(listen="0.0.0.0",

@@ -7,3 +7,5 @@ pysndfx==0.3.6
 logzero==1.5.0
 python-dotenv==0.10.3
 telegram==0.0.1
+redis>=4.0.0
+hiredis>=2.0.0
