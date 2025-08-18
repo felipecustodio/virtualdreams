@@ -30,8 +30,21 @@ This document explains how to run the Virtual Dreams Telegram bot using Docker.
 
 The Docker setup includes:
 
-- **virtualdreams**: The main Telegram bot application
-- **redis**: Redis cache for improved performance
+- **virtualdreams**: The main Telegram bot application with Redis caching support
+- **redis**: Redis cache for improved performance and distributed caching
+
+## Features
+
+### Caching System
+The bot includes a dual-layer caching system:
+1. **Redis Cache**: Fast, distributed caching for processed audio files (7-day TTL)
+2. **File Cache**: Local file system cache as fallback
+
+The caching system automatically:
+- Checks Redis cache first for faster retrieval
+- Falls back to file cache if Redis is unavailable
+- Stores newly processed audio in both Redis and file cache
+- Gracefully handles Redis connection issues
 
 ## Configuration
 

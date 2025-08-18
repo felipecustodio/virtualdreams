@@ -32,6 +32,14 @@ import urllib.request
 import urllib.parse
 import youtube_dl
 
+# redis for caching
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    logger.warning("Redis not available, using file-based caching only")
+
 # logging
 import logzero
 from logzero import logger
@@ -39,6 +47,19 @@ from logzero import setup_logger
 
 logzero.logfile("log.log", maxBytes=1e6, backupCount=5)
 stats = setup_logger(name="stats", logfile="requests.log", level=logging.INFO, maxBytes=1e6, backupCount=5)
+
+# Redis setup for caching
+redis_client = None
+if REDIS_AVAILABLE:
+    try:
+        redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+        redis_client = redis.from_url(redis_url, decode_responses=False)
+        # Test connection
+        redis_client.ping()
+        logger.info("Redis connection established")
+    except Exception as e:
+        logger.warning(f"Could not connect to Redis: {e}. Using file-based caching only.")
+        redis_client = None
 
 # vaporwave parameters
 fx = (
@@ -71,6 +92,50 @@ error_str = emoji_cd + " ＥＲＲＯＲ.\nSomething went wrong!\nAn error has o
 working_str = emoji_palm_tree + " ＷＯＲＫＩＮＧ．．．\nThis can take up a bit more than a minute. Sit back and relax. If you don't hear back from me, try again!"
 help_str = emoji_palm_tree + " Ｗｅｌｃｏｍｅ ｔｏ Ｖｉｒｔｕａｌ Ｄｒｅａｍｓ. " + emoji_palm_tree + "\n\nＨＯＷ ＴＯ ＵＳＥ:\n" + emoji_cd + " /vapor \"song name\"\n" + emoji_video_camera + " /vapor YouTube URL.\n\nWorks with videos between 5 seconds and 7 minutes.\n\nIf your request is taking too long, please try again.\n"
 unknown_str = emoji_cd + " ＥＲＲＯＲ.\nThis is not a valid command. Use /help to find out more."
+
+
+# Cache helper functions
+def get_cached_audio(title):
+    """Check if processed audio exists in cache (Redis or file)"""
+    vapor_path = title + "_vapor.wav"
+    
+    # Check Redis cache first if available
+    if redis_client:
+        try:
+            cached_data = redis_client.get(f"vapor_audio:{title}")
+            if cached_data:
+                # Write cached data to file for sending
+                with open(vapor_path, 'wb') as f:
+                    f.write(cached_data)
+                logger.info(f"Retrieved {title} from Redis cache")
+                return vapor_path
+        except Exception as e:
+            logger.warning(f"Redis cache read error: {e}")
+    
+    # Check file cache
+    if Path(vapor_path).is_file():
+        logger.info(f"Retrieved {title} from file cache")
+        return vapor_path
+    
+    return None
+
+
+def cache_audio(title, vapor_path):
+    """Store processed audio in cache (Redis and file)"""
+    try:
+        # Cache in Redis if available
+        if redis_client and Path(vapor_path).is_file():
+            with open(vapor_path, 'rb') as f:
+                audio_data = f.read()
+            # Cache for 7 days (604800 seconds)
+            redis_client.setex(f"vapor_audio:{title}", 604800, audio_data)
+            logger.info(f"Cached {title} in Redis")
+        
+        # File is already cached by the processing logic
+        logger.info(f"Cached {title} in file system")
+        
+    except Exception as e:
+        logger.warning(f"Caching error: {e}")
 
 
 def vapor(query, bot, request_id, chat_id):
@@ -158,13 +223,12 @@ def vapor(query, bot, request_id, chat_id):
 
     # check if cached audio exists
     logger.info("[" + str(request_id) + "] " + "Checking if cached audio exists...")
-    vapor_path = title + "_vapor.wav"
-    if Path(vapor_path).is_file():
-        vapor_path = title + "_vapor.wav"
+    cached_audio_path = get_cached_audio(title)
+    if cached_audio_path:
         try:
-            bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
+            bot.send_audio(chat_id=chat_id, audio=open(cached_audio_path, 'rb'))
         except Exception as e:
-            logger.error("[" + str(request_id) + "] " + e)
+            logger.error("[" + str(request_id) + "] " + str(e))
             raise ValueError('Failed to send audio.')
         return 
 
@@ -229,8 +293,11 @@ def vapor(query, bot, request_id, chat_id):
     try:
         bot.send_audio(chat_id=chat_id, audio=open(vapor_path, 'rb'))
     except Exception as e:
-        logger.error("[" + str(request_id) + "] " + e)
+        logger.error("[" + str(request_id) + "] " + str(e))
         raise ValueError('Failed to send audio.')
+
+    # cache the processed audio
+    cache_audio(title, vapor_path)
 
     # cleanup
     try:
