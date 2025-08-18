@@ -14,6 +14,12 @@
         <meta charset="utf-8" />
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="Virtual Dreams - A vaporwave music generator bot. Create aesthetic vapor wave music in your virtual paradise. Experience nostalgic synthwave vibes and retro music generation.">
+        <meta name="keywords" content="vaporwave, synthwave, music generator, aesthetic, retro, vapor wave, virtual dreams, telegram bot">
+        <meta name="author" content="Virtual Dreams">
+        <meta property="og:title" content="Virtual Dreams - Vaporwave Generator">
+        <meta property="og:description" content="Create aesthetic vaporwave music in your virtual paradise. A nostalgic music generation experience.">
+        <meta property="og:type" content="website">
         <title>Virtual Dreams</title>
         
         <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
@@ -30,7 +36,7 @@
         
         <!-- Video BG -->
         <div class="fullscreen-bg">
-            <video loop muted autoplay class="fullscreen-bg__video">
+            <video loop muted autoplay playsinline class="fullscreen-bg__video">
                 <source src="assets/nakatomi.mp4" type="video/mp4">
         </video>
         </div>
@@ -62,9 +68,40 @@
         </script>
 
         <script type="text/javascript">
-            $(document).ready(function () {
-                // alert('Document Ready'); 
-                $('body').removeClass('fade-out');
+            // Replace jQuery with vanilla JavaScript
+            document.addEventListener('DOMContentLoaded', function() {
+                // Remove fade-out class when document is ready
+                document.body.classList.remove('fade-out');
+                
+                // Enhanced mobile video handling
+                var video = document.querySelector('.fullscreen-bg__video');
+                if (video) {
+                    // Attempt to play video on mobile after user interaction
+                    var playVideo = function() {
+                        video.play().catch(function(error) {
+                            console.log('Video autoplay prevented:', error);
+                        });
+                    };
+                    
+                    // Try to play immediately
+                    playVideo();
+                    
+                    // Also try to play after first user interaction
+                    var hasPlayed = false;
+                    document.addEventListener('touchstart', function() {
+                        if (!hasPlayed) {
+                            playVideo();
+                            hasPlayed = true;
+                        }
+                    }, { once: true });
+                    
+                    document.addEventListener('click', function() {
+                        if (!hasPlayed) {
+                            playVideo();
+                            hasPlayed = true;
+                        }
+                    }, { once: true });
+                }
             });
         </script>
 

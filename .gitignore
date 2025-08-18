@@ -6,3 +6,5 @@ backup/
 *.mp3
 *.bundle
 __pycache__/
+*.pyc
+*.pyo
