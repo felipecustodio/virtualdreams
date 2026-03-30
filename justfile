@@ -80,25 +80,11 @@ check: lint typecheck
 # Smoke-test the chorus-detector binary on a generated WAV
 smoke-test-binary:
     @echo "Generating 30s test WAV..."
-    python3 -c "
-import wave, struct, math
-sr, dur = 22050, 30
-with wave.open('/tmp/vd_test_input.wav', 'w') as f:
-    f.setnchannels(1); f.setsampwidth(2); f.setframerate(sr)
-    for i in range(sr * dur):
-        f.writeframes(struct.pack('<h', int(32767 * math.sin(2 * math.pi * 440 * i / sr))))
-print('Input: /tmp/vd_test_input.wav')
-"
+    python3 -c "import wave,struct,math; sr=22050; dur=30; f=wave.open('/tmp/vd_test_input.wav','w'); f.setnchannels(1); f.setsampwidth(2); f.setframerate(sr); [f.writeframes(struct.pack('<h',int(32767*math.sin(2*math.pi*440*i/sr)))) for i in range(sr*dur)]; f.close(); print('Input: /tmp/vd_test_input.wav')"
     ./chorus-detector/target/release/chorus-detector \
         /tmp/vd_test_input.wav /tmp/vd_test_output.wav --duration 15
     @echo "Output: /tmp/vd_test_output.wav"
-    python3 -c "
-import os
-size = os.path.getsize('/tmp/vd_test_output.wav')
-expected = 15 * 22050 * 4  # 15s × 22050Hz × float32
-print(f'File size: {size} bytes (expected ~{expected})')
-print('✓ OK' if abs(size - expected) < 500 else '✗ Unexpected size')
-"
+    python3 -c "import os; size=os.path.getsize('/tmp/vd_test_output.wav'); expected=15*22050*4; print('File size: %d bytes (expected ~%d)' % (size,expected)); print('OK' if abs(size-expected)<500 else 'Unexpected size')"
 
 # Remove compiled artifacts and caches
 clean:
