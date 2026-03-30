@@ -8,3 +8,4 @@ backup/
 __pycache__/
 *.pyc
 *.pyo
+.worktrees/
