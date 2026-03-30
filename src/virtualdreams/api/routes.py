@@ -19,7 +19,7 @@ class CreateJobRequest(BaseModel):
 
 
 def youtube_input_enabled() -> bool:
-    return os.getenv("ENABLE_YOUTUBE_INPUT", "true").lower() in {"1", "true", "yes", "on"}
+    return os.getenv("ENABLE_YOUTUBE_INPUT", "false").lower() in {"1", "true", "yes", "on"}
 
 
 @router.get("/healthz")

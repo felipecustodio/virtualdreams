@@ -126,6 +126,12 @@ cp .env.example .env
 
 Set `CHORUS_DETECTOR_BIN` in `.env` if needed.
 
+If you want local YouTube URL/search support in the frontend and API, also set:
+
+```bash
+ENABLE_YOUTUBE_INPUT=true
+```
+
 ### Run
 
 ```bash

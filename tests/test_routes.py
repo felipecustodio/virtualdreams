@@ -17,14 +17,16 @@ async def client():
         yield c
 
 
-async def test_create_job_returns_202(client):
+async def test_create_job_returns_202(client, monkeypatch):
+    monkeypatch.setenv("ENABLE_YOUTUBE_INPUT", "true")
     with patch("virtualdreams.jobs.manager.JobManager._run_pipeline", new=AsyncMock()):
         resp = await client.post("/jobs", json={"query": "lofi chill"})
     assert resp.status_code == 202
     assert "job_id" in resp.json()
 
 
-async def test_get_job_pending(client):
+async def test_get_job_pending(client, monkeypatch):
+    monkeypatch.setenv("ENABLE_YOUTUBE_INPUT", "true")
     with patch("virtualdreams.jobs.manager.JobManager._run_pipeline", new=AsyncMock()):
         create = await client.post("/jobs", json={"query": "lofi chill"})
     job_id = create.json()["job_id"]
@@ -48,14 +50,24 @@ async def test_healthz(client):
     assert resp.json() == {"status": "ok"}
 
 
-async def test_config_defaults_to_youtube_enabled(client):
+async def test_config_defaults_to_youtube_disabled(client):
+    resp = await client.get("/config")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"youtube_input_enabled": False}
+
+
+async def test_config_enables_youtube_when_configured(client, monkeypatch):
+    monkeypatch.setenv("ENABLE_YOUTUBE_INPUT", "true")
+
     resp = await client.get("/config")
 
     assert resp.status_code == 200
     assert resp.json() == {"youtube_input_enabled": True}
 
 
-async def test_job_events_stream_completed_status(client):
+async def test_job_events_stream_completed_status(client, monkeypatch):
+    monkeypatch.setenv("ENABLE_YOUTUBE_INPUT", "true")
     with patch("virtualdreams.jobs.manager.JobManager._run_pipeline", new=AsyncMock()):
         create = await client.post("/jobs", json={"query": "lofi chill"})
     job_id = create.json()["job_id"]
@@ -90,7 +102,8 @@ async def test_create_upload_job_returns_202(client):
     assert "job_id" in resp.json()
 
 
-async def test_get_audio_completed(client, tmp_path):
+async def test_get_audio_completed(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("ENABLE_YOUTUBE_INPUT", "true")
     audio_file = tmp_path / "vapor.wav"
     audio_file.write_bytes(b"RIFF" + b"\x00" * 100)
 
@@ -109,7 +122,8 @@ async def test_get_audio_completed(client, tmp_path):
     assert job.fetched is True
 
 
-async def test_get_audio_already_fetched(client, tmp_path):
+async def test_get_audio_already_fetched(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("ENABLE_YOUTUBE_INPUT", "true")
     audio_file = tmp_path / "vapor.wav"
     audio_file.write_bytes(b"RIFF" + b"\x00" * 100)
 
@@ -127,7 +141,8 @@ async def test_get_audio_already_fetched(client, tmp_path):
     assert resp.status_code == 410
 
 
-async def test_get_audio_not_completed(client):
+async def test_get_audio_not_completed(client, monkeypatch):
+    monkeypatch.setenv("ENABLE_YOUTUBE_INPUT", "true")
     with patch("virtualdreams.jobs.manager.JobManager._run_pipeline", new=AsyncMock()):
         create = await client.post("/jobs", json={"query": "lofi chill"})
     job_id = create.json()["job_id"]
