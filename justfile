@@ -11,6 +11,10 @@ default:
 dev:
     docker compose up --build
 
+# Stop the server
+down:
+    docker compose down
+
 # Run the test suite locally
 test:
     uv run pytest -v
