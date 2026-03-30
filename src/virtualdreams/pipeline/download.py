@@ -1,4 +1,5 @@
 import asyncio
+import os
 from pathlib import Path
 
 YOUTUBE_URL_PREFIXES = (
@@ -15,6 +16,9 @@ MAX_DURATION = 420  # seconds
 async def download_audio(query: str, output_dir: Path) -> Path:
     """Download audio from YouTube as WAV. Returns path to WAV file."""
     is_url = query.lower().startswith(YOUTUBE_URL_PREFIXES)
+    js_runtime = os.getenv("YTDLP_JS_RUNTIME")
+    cookies_file = os.getenv("YTDLP_COOKIES_FILE")
+    cookies_content = os.getenv("YTDLP_COOKIES_CONTENT")
 
     args = [
         "yt-dlp",
@@ -25,6 +29,16 @@ async def download_audio(query: str, output_dir: Path) -> Path:
         "--quiet",
         "-o", str(output_dir / "%(id)s.%(ext)s"),
     ]
+
+    if js_runtime:
+        args += ["--js-runtimes", js_runtime]
+
+    if cookies_file:
+        args += ["--cookies", cookies_file]
+    elif cookies_content:
+        rendered_cookies = output_dir / "yt-dlp-cookies.txt"
+        rendered_cookies.write_text(cookies_content)
+        args += ["--cookies", str(rendered_cookies)]
 
     if not is_url:
         args += ["--default-search", "ytsearch1:"]

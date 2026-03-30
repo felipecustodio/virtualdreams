@@ -44,3 +44,46 @@ async def test_url_passthrough(tmp_path):
     assert "-f" in args
     assert "bestaudio/best" in args
     assert "--default-search" not in args
+
+
+async def test_download_uses_cookie_file_when_configured(tmp_path, monkeypatch):
+    fake_wav = tmp_path / "abc123.wav"
+    fake_wav.write_bytes(b"RIFF")
+    cookies = tmp_path / "cookies.txt"
+    cookies.write_text("# Netscape HTTP Cookie File\n")
+    monkeypatch.setenv("YTDLP_COOKIES_FILE", str(cookies))
+
+    with patch("asyncio.create_subprocess_exec", return_value=await _mock_proc(0)) as mock_exec:
+        await download_audio("https://www.youtube.com/watch?v=abc123", tmp_path)
+
+    args = mock_exec.call_args[0]
+    assert "--cookies" in args
+    assert str(cookies) in args
+
+
+async def test_download_renders_cookie_content_when_configured(tmp_path, monkeypatch):
+    fake_wav = tmp_path / "abc123.wav"
+    fake_wav.write_bytes(b"RIFF")
+    monkeypatch.setenv("YTDLP_COOKIES_CONTENT", "# Netscape HTTP Cookie File\n.youtube.com\tTRUE")
+
+    with patch("asyncio.create_subprocess_exec", return_value=await _mock_proc(0)) as mock_exec:
+        await download_audio("https://www.youtube.com/watch?v=abc123", tmp_path)
+
+    args = mock_exec.call_args[0]
+    cookies_path = tmp_path / "yt-dlp-cookies.txt"
+    assert "--cookies" in args
+    assert str(cookies_path) in args
+    assert cookies_path.exists()
+
+
+async def test_download_uses_configured_js_runtime(tmp_path, monkeypatch):
+    fake_wav = tmp_path / "abc123.wav"
+    fake_wav.write_bytes(b"RIFF")
+    monkeypatch.setenv("YTDLP_JS_RUNTIME", "bun")
+
+    with patch("asyncio.create_subprocess_exec", return_value=await _mock_proc(0)) as mock_exec:
+        await download_audio("https://www.youtube.com/watch?v=abc123", tmp_path)
+
+    args = mock_exec.call_args[0]
+    assert "--js-runtimes" in args
+    assert "bun" in args

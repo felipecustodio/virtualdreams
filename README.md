@@ -27,8 +27,8 @@ flowchart TD
     F --> G[ffmpeg applies vaporwave slowdown and ambience]
     G --> H[Final WAV moved to persistent temp file]
     H --> I[Job marked completed]
-    I --> J[Browser listens on /jobs/{id}/events]
-    J --> K[GET /jobs/{id}/audio]
+    I --> J["Browser listens on /jobs/{id}/events"]
+    J --> K["GET /jobs/{id}/audio"]
 ```
 
 ## Architecture

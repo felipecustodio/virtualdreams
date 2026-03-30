@@ -18,6 +18,9 @@ RUN curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp 
         -o /usr/local/bin/yt-dlp \
     && chmod +x /usr/local/bin/yt-dlp
 
+# Bun for yt-dlp YouTube JS challenge solving
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+
 # uv (Python package manager)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
@@ -36,6 +39,7 @@ RUN uv sync --frozen --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV CHORUS_DETECTOR_BIN=/usr/local/bin/chorus-detector
+ENV YTDLP_JS_RUNTIME=bun
 ENV HOST=0.0.0.0
 ENV PORT=8000
 
