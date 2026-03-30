@@ -1,0 +1,13 @@
+[package]
+name = "chorus-detector"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "chorus-detector"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+hound = "3"
+rustfft = "6"
