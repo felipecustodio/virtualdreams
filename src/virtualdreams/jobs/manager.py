@@ -1,8 +1,13 @@
 import asyncio
+import shutil
+import tempfile
 import time
 from pathlib import Path
 
 from .models import Job, JobStatus
+from ..pipeline.download import download_audio
+from ..pipeline.chorus import extract_chorus
+from ..pipeline.effects import apply_vaporwave
 
 JOB_TTL = 600  # seconds
 CLEANUP_INTERVAL = 60  # seconds
@@ -34,8 +39,33 @@ class JobManager:
         return self._jobs.get(job_id)
 
     async def _run_pipeline(self, job_id: str, query: str) -> None:
-        # Implemented in Task 7 — wired after pipeline modules exist
-        pass
+        job = self._jobs.get(job_id)
+        if job is None:
+            return
+        job.status = JobStatus.RUNNING
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmp = Path(tmpdir)
+
+                wav_path = await download_audio(query, tmp)
+                chorus_path = tmp / "chorus.wav"
+                vapor_path = tmp / "vapor.wav"
+
+                await extract_chorus(wav_path, chorus_path)
+                await apply_vaporwave(chorus_path, vapor_path)
+
+                # Move out of tmpdir before it is cleaned up
+                final = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+                final.close()
+                shutil.move(str(vapor_path), final.name)
+
+                job.audio_path = final.name
+                job.status = JobStatus.COMPLETED
+
+        except Exception as exc:
+            job.status = JobStatus.FAILED
+            job.error = str(exc)
 
     async def _cleanup_loop(self) -> None:
         while True:
