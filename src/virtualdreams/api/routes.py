@@ -1,8 +1,12 @@
 import asyncio
 import json
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+import os
+import tempfile
 from pathlib import Path
+
+import aiofiles
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from ..jobs.models import JobStatus
@@ -14,14 +18,52 @@ class CreateJobRequest(BaseModel):
     query: str
 
 
+def youtube_input_enabled() -> bool:
+    return os.getenv("ENABLE_YOUTUBE_INPUT", "true").lower() in {"1", "true", "yes", "on"}
+
+
 @router.get("/healthz")
 async def healthz() -> dict:
     return {"status": "ok"}
 
 
+@router.get("/config")
+async def config() -> dict:
+    return {"youtube_input_enabled": youtube_input_enabled()}
+
+
 @router.post("/jobs", status_code=202)
 async def create_job(body: CreateJobRequest, request: Request) -> dict:
-    job = request.app.state.job_manager.create_job(body.query)
+    if not youtube_input_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="YouTube input is disabled on this deployment. Upload audio instead.",
+        )
+    job = request.app.state.job_manager.create_query_job(body.query)
+    return {"job_id": job.job_id}
+
+
+@router.post("/jobs/upload", status_code=202)
+async def create_upload_job(
+    request: Request,
+    file: UploadFile = File(...),
+) -> dict:
+    suffix = Path(file.filename or "upload.bin").suffix or ".bin"
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    temp_path = Path(temp_file.name)
+    temp_file.close()
+
+    try:
+        async with aiofiles.open(temp_path, "wb") as uploaded:
+            while chunk := await file.read(1024 * 1024):
+                await uploaded.write(chunk)
+    except Exception:
+        temp_path.unlink(missing_ok=True)
+        raise
+    finally:
+        await file.close()
+
+    job = request.app.state.job_manager.create_upload_job(str(temp_path))
     return {"job_id": job.job_id}
 
 

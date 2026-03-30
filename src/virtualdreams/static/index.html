@@ -283,11 +283,18 @@
       text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
     }
 
+    .input-shell {
+      width: min(100%, 560px);
+      margin-inline: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
     .input-row {
       display: flex;
       gap: 0.5rem;
-      width: min(100%, 560px);
-      margin-inline: auto;
+      width: 100%;
       padding: 0.55rem;
       border: 1px solid rgba(255, 255, 255, 0.58);
       border-radius: 24px;
@@ -296,7 +303,7 @@
       backdrop-filter: blur(18px);
     }
 
-    .query-input {
+    .query-input, .upload-input {
       flex: 1;
       background: var(--surface);
       border: 1px solid var(--border);
@@ -313,14 +320,47 @@
       color: var(--text-muted);
     }
 
-    .query-input:hover:not(:focus) {
+    .query-input:hover:not(:focus), .upload-input:hover:not(:focus) {
       border-color: var(--border-hi);
     }
 
-    .query-input:focus {
+    .query-input:focus, .upload-input:focus {
       border-color: var(--pink-bright);
       box-shadow: 0 0 0 1px rgba(255, 111, 177, 0.28),
                   0 0 22px rgba(114, 235, 244, 0.22);
+    }
+
+    .upload-input {
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .upload-input::file-selector-button {
+      margin-right: 0.85rem;
+      border: none;
+      border-radius: 12px;
+      padding: 0.55rem 0.8rem;
+      background: rgba(255, 111, 177, 0.14);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 0.7rem;
+      cursor: pointer;
+    }
+
+    .input-note {
+      font-size: 0.67rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .input-note a {
+      color: var(--pink);
+      text-decoration: none;
+    }
+
+    .input-note a:hover {
+      text-decoration: underline;
     }
 
     .submit-btn {
@@ -601,17 +641,26 @@
     </div>
 
     <!-- Input -->
-    <div class="input-row">
-      <input
-        id="query"
-        type="text"
-        placeholder="Paste a YouTube URL…"
-        class="query-input"
-      />
-      <button id="submitBtn" class="submit-btn">
-        <i data-lucide="sparkles"></i>
-        <span>Process</span>
-      </button>
+    <div class="input-shell">
+      <div class="input-row">
+        <input
+          id="query"
+          type="text"
+          placeholder="Paste a YouTube URL…"
+          class="query-input"
+        />
+        <input
+          id="audioFile"
+          type="file"
+          accept="audio/*,.wav,.mp3,.m4a,.aac,.ogg,.flac"
+          class="upload-input hidden"
+        />
+        <button id="submitBtn" class="submit-btn">
+          <i data-lucide="sparkles"></i>
+          <span id="submitLabel">Process</span>
+        </button>
+      </div>
+      <p id="inputNote" class="input-note"></p>
     </div>
 
     <!-- Status / result card — hidden initially -->
@@ -650,7 +699,10 @@
     const API = '';  // same origin
 
     const queryEl    = document.getElementById('query');
+    const audioFileEl= document.getElementById('audioFile');
+    const inputNoteEl= document.getElementById('inputNote');
     const submitBtn  = document.getElementById('submitBtn');
+    const submitLabel= document.getElementById('submitLabel');
     const card       = document.getElementById('card');
     const metaEl     = document.getElementById('meta');
     const thumb      = document.getElementById('thumb');
@@ -666,8 +718,35 @@
 
     let eventStream = null;
     let playerUrl = null;
+    let appConfig = { youtube_input_enabled: true };
 
     window.lucide?.createIcons();
+
+    async function loadConfig() {
+      try {
+        const res = await fetch(`${API}/config`);
+        if (res.ok) {
+          appConfig = await res.json();
+        }
+      } catch (_) {
+        appConfig = { youtube_input_enabled: true };
+      }
+      applyInputMode();
+    }
+
+    function applyInputMode() {
+      const youtubeMode = Boolean(appConfig.youtube_input_enabled);
+      queryEl.classList.toggle('hidden', !youtubeMode);
+      audioFileEl.classList.toggle('hidden', youtubeMode);
+      submitLabel.textContent = youtubeMode ? 'Process' : 'Upload';
+
+      if (youtubeMode) {
+        queryEl.placeholder = 'Paste a YouTube URL or search query…';
+        inputNoteEl.textContent = 'Local mode: paste a YouTube URL or search query.';
+      } else {
+        inputNoteEl.innerHTML = 'Hosted mode: upload an audio file here. To use YouTube links, run VirtualDreams locally from <a href="https://github.com/felipecustodio/virtualdreams/" target="_blank" rel="noreferrer">the project on GitHub</a>.';
+      }
+    }
 
     function isYouTubeUrl(q) {
       return /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//.test(q.trim());
@@ -754,8 +833,12 @@
     }
 
     async function submit() {
+      const youtubeMode = Boolean(appConfig.youtube_input_enabled);
       const query = queryEl.value.trim();
-      if (!query) return;
+      const file = audioFileEl.files?.[0];
+
+      if (youtubeMode && !query) return;
+      if (!youtubeMode && !file) return;
 
       // reset
       closeEventStream();
@@ -773,17 +856,27 @@
       setStatus('loading', 'Submitting…');
 
       // fetch metadata early if it's a URL
-      if (isYouTubeUrl(query)) fetchMeta(query);
+      if (youtubeMode && isYouTubeUrl(query)) fetchMeta(query);
 
       try {
-        const res = await fetch(`${API}/jobs`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query }),
-        });
+        let res;
+        if (youtubeMode) {
+          res = await fetch(`${API}/jobs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query }),
+          });
+        } else {
+          const formData = new FormData();
+          formData.append('file', file);
+          res = await fetch(`${API}/jobs/upload`, {
+            method: 'POST',
+            body: formData,
+          });
+        }
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         const { job_id } = await res.json();
-        setStatus('loading', 'Queued…');
+        setStatus('loading', youtubeMode ? 'Queued…' : 'Upload received…');
         openJobEvents(job_id);
       } catch (e) {
         setStatus('error', 'Failed to submit job');
@@ -796,6 +889,7 @@
 
     submitBtn.addEventListener('click', submit);
     queryEl.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+    loadConfig();
   </script>
 
 </body>

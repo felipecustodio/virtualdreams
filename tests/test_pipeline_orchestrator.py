@@ -47,3 +47,35 @@ async def test_pipeline_marks_failed_on_error():
 
     assert job.status == JobStatus.FAILED
     assert "yt-dlp failed" in job.error
+
+
+async def test_upload_pipeline_completes(tmp_path):
+    manager = JobManager()
+    uploaded = tmp_path / "upload.mp3"
+    uploaded.write_bytes(b"fake")
+
+    async def fake_normalize(input_path, output_dir):
+        wav = output_dir / "input.wav"
+        wav.write_bytes(b"RIFF")
+        return wav
+
+    async def fake_chorus(input_path, output_path, duration=15):
+        output_path.write_bytes(b"RIFF")
+
+    async def fake_effects(input_path, output_path):
+        output_path.write_bytes(b"RIFF")
+
+    with (
+        patch("virtualdreams.jobs.manager.normalize_uploaded_audio", side_effect=fake_normalize),
+        patch("virtualdreams.jobs.manager.extract_chorus", side_effect=fake_chorus),
+        patch("virtualdreams.jobs.manager.apply_vaporwave", side_effect=fake_effects),
+    ):
+        job = manager.create_upload_job(str(uploaded))
+        await asyncio.sleep(0.1)
+
+    assert job.status == JobStatus.COMPLETED
+    assert job.audio_path is not None
+    assert Path(job.audio_path).exists()
+    assert not uploaded.exists()
+
+    Path(job.audio_path).unlink(missing_ok=True)

@@ -87,3 +87,23 @@ async def test_download_uses_configured_js_runtime(tmp_path, monkeypatch):
     args = mock_exec.call_args[0]
     assert "--js-runtimes" in args
     assert "bun" in args
+
+
+async def test_download_uses_logged_out_po_token_flow(tmp_path, monkeypatch):
+    fake_wav = tmp_path / "abc123.wav"
+    fake_wav.write_bytes(b"RIFF")
+    monkeypatch.setenv("YTDLP_YT_VISITOR_DATA", "visitor-data-token")
+    monkeypatch.setenv("YTDLP_YT_PO_TOKEN", "mweb.gvs+po-token")
+
+    with patch("asyncio.create_subprocess_exec", return_value=await _mock_proc(0)) as mock_exec:
+        await download_audio("https://www.youtube.com/watch?v=abc123", tmp_path)
+
+    args = mock_exec.call_args[0]
+    extractor_index = args.index("--extractor-args")
+    extractor_args = args[extractor_index + 1]
+
+    assert extractor_args.startswith("youtube:")
+    assert "player_client=mweb" in extractor_args
+    assert "visitor_data=visitor-data-token" in extractor_args
+    assert "player_skip=webpage,configs" in extractor_args
+    assert "po_token=mweb.gvs+po-token" in extractor_args

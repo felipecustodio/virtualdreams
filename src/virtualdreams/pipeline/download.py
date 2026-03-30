@@ -19,6 +19,9 @@ async def download_audio(query: str, output_dir: Path) -> Path:
     js_runtime = os.getenv("YTDLP_JS_RUNTIME")
     cookies_file = os.getenv("YTDLP_COOKIES_FILE")
     cookies_content = os.getenv("YTDLP_COOKIES_CONTENT")
+    yt_visitor_data = os.getenv("YTDLP_YT_VISITOR_DATA")
+    yt_po_token = os.getenv("YTDLP_YT_PO_TOKEN")
+    yt_player_client = os.getenv("YTDLP_YT_PLAYER_CLIENT")
 
     args = [
         "yt-dlp",
@@ -39,6 +42,22 @@ async def download_audio(query: str, output_dir: Path) -> Path:
         rendered_cookies = output_dir / "yt-dlp-cookies.txt"
         rendered_cookies.write_text(cookies_content)
         args += ["--cookies", str(rendered_cookies)]
+
+    extractor_args: list[str] = []
+    if yt_player_client:
+        extractor_args.append(f"player_client={yt_player_client}")
+    elif yt_po_token:
+        extractor_args.append("player_client=mweb")
+
+    if yt_visitor_data:
+        extractor_args.append(f"visitor_data={yt_visitor_data}")
+        extractor_args.append("player_skip=webpage,configs")
+
+    if yt_po_token:
+        extractor_args.append(f"po_token={yt_po_token}")
+
+    if extractor_args:
+        args += ["--extractor-args", f"youtube:{';'.join(extractor_args)}"]
 
     if not is_url:
         args += ["--default-search", "ytsearch1:"]

@@ -53,3 +53,14 @@ async def test_evict_expired_keeps_fresh_jobs(manager):
         job = manager.create_job("test query")
     manager._evict_expired()
     assert manager.get_job(job.job_id) is job
+
+
+async def test_create_upload_job_returns_job(manager, tmp_path):
+    upload = tmp_path / "upload.mp3"
+    upload.write_bytes(b"fake")
+
+    with patch.object(manager, "_run_pipeline", new=AsyncMock()):
+        job = manager.create_upload_job(str(upload))
+
+    assert job.job_id
+    assert job.status == JobStatus.PENDING

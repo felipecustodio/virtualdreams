@@ -48,6 +48,13 @@ async def test_healthz(client):
     assert resp.json() == {"status": "ok"}
 
 
+async def test_config_defaults_to_youtube_enabled(client):
+    resp = await client.get("/config")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"youtube_input_enabled": True}
+
+
 async def test_job_events_stream_completed_status(client):
     with patch("virtualdreams.jobs.manager.JobManager._run_pipeline", new=AsyncMock()):
         create = await client.post("/jobs", json={"query": "lofi chill"})
@@ -61,6 +68,26 @@ async def test_job_events_stream_completed_status(client):
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("text/event-stream")
     assert '"status": "completed"' in resp.text
+
+
+async def test_create_job_rejects_query_when_youtube_disabled(client, monkeypatch):
+    monkeypatch.setenv("ENABLE_YOUTUBE_INPUT", "false")
+
+    resp = await client.post("/jobs", json={"query": "lofi chill"})
+
+    assert resp.status_code == 403
+    assert "Upload audio instead" in resp.json()["detail"]
+
+
+async def test_create_upload_job_returns_202(client):
+    with patch("virtualdreams.jobs.manager.JobManager._run_pipeline", new=AsyncMock()):
+        resp = await client.post(
+            "/jobs/upload",
+            files={"file": ("clip.mp3", b"fake-audio", "audio/mpeg")},
+        )
+
+    assert resp.status_code == 202
+    assert "job_id" in resp.json()
 
 
 async def test_get_audio_completed(client, tmp_path):
