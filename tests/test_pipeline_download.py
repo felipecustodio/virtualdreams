@@ -41,4 +41,6 @@ async def test_url_passthrough(tmp_path):
         await download_audio("https://www.youtube.com/watch?v=abc123", tmp_path)
 
     args = mock_exec.call_args[0]
+    assert "-f" in args
+    assert "bestaudio/best" in args
     assert "--default-search" not in args

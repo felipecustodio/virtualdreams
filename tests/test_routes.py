@@ -41,6 +41,21 @@ async def test_get_job_not_found(client):
     assert resp.status_code == 404
 
 
+async def test_job_events_stream_completed_status(client):
+    with patch("virtualdreams.jobs.manager.JobManager._run_pipeline", new=AsyncMock()):
+        create = await client.post("/jobs", json={"query": "lofi chill"})
+    job_id = create.json()["job_id"]
+
+    job_manager = client._transport.app.state.job_manager  # type: ignore[attr-defined]
+    job = job_manager.get_job(job_id)
+    job.status = JobStatus.COMPLETED
+
+    resp = await client.get(f"/jobs/{job_id}/events")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/event-stream")
+    assert '"status": "completed"' in resp.text
+
+
 async def test_get_audio_completed(client, tmp_path):
     audio_file = tmp_path / "vapor.wav"
     audio_file.write_bytes(b"RIFF" + b"\x00" * 100)
@@ -85,3 +100,16 @@ async def test_get_audio_not_completed(client):
 
     resp = await client.get(f"/jobs/{job_id}/audio")
     assert resp.status_code == 404
+
+
+async def test_index_uses_smooth_separator_animation(client):
+    resp = await client.get("/")
+
+    assert resp.status_code == 200
+    assert "hero-scene" in resp.text
+    assert "title-wrap" in resp.text
+    assert "Vaporwave chorus maker" in resp.text
+    assert "Cormorant+Garamond" in resp.text
+    assert "max-width: 1120px" in resp.text
+    assert "width: min(100%, 560px)" in resp.text
+    assert "inset: 0;" in resp.text

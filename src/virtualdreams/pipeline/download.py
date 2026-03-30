@@ -18,6 +18,7 @@ async def download_audio(query: str, output_dir: Path) -> Path:
 
     args = [
         "yt-dlp",
+        "-f", "bestaudio/best",
         "--extract-audio",
         "--audio-format", "wav",
         "--no-playlist",

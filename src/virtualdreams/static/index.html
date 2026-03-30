@@ -6,35 +6,41 @@
   <title>VirtualDreams</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:           #060010;
-      --surface:      #0c0020;
-      --surface-2:    #130030;
-      --border:       #280050;
-      --border-hi:    #7a00cc;
-      --pink:         #ff2d78;
-      --pink-bright:  #ff5499;
-      --cyan:         #00e5ff;
-      --purple:       #bf5fff;
-      --text:         #f0e0ff;
-      --text-muted:   #7a5a9a;
-      --success:      #00ff9d;
-      --error:        #ff3566;
-      --font-display: 'VT323', monospace;
+      --bg-top:       #ffe6f1;
+      --bg-mid:       #ffd4ef;
+      --bg-bottom:    #c9fbff;
+      --surface:      rgba(255, 247, 252, 0.84);
+      --surface-2:    rgba(255, 233, 245, 0.9);
+      --surface-3:    rgba(201, 251, 255, 0.78);
+      --border:       rgba(255, 138, 193, 0.35);
+      --border-hi:    rgba(255, 109, 174, 0.7);
+      --pink:         #ff5faa;
+      --pink-bright:  #ff7bbf;
+      --coral:        #ff8f89;
+      --aqua:         #72ebf4;
+      --aqua-deep:    #24cdd9;
+      --lavender:     #bb9cff;
+      --pearl:        #fffdfc;
+      --text:         #5c2d4d;
+      --text-muted:   #946f91;
+      --success:      #26ba9d;
+      --error:        #d95b7b;
+      --font-display: 'Cormorant Garamond', serif;
       --font-body:    'IBM Plex Mono', monospace;
     }
 
     body {
       font-family: var(--font-body);
-      background-color: var(--bg);
-      background-image:
-        linear-gradient(rgba(191, 95, 255, 0.045) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(191, 95, 255, 0.045) 1px, transparent 1px);
-      background-size: 48px 48px;
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.72), transparent 32%),
+        radial-gradient(circle at 12% 18%, rgba(255, 170, 214, 0.46), transparent 20%),
+        radial-gradient(circle at 88% 10%, rgba(114, 235, 244, 0.34), transparent 22%),
+        linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 44%, var(--bg-bottom) 100%);
       color: var(--text);
       min-height: 100svh;
       display: flex;
@@ -44,173 +50,226 @@
       padding: 1.5rem;
     }
 
-    /* Scanline overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        linear-gradient(115deg, rgba(255, 255, 255, 0.22), transparent 45%),
+        radial-gradient(circle at bottom, rgba(255, 255, 255, 0.45), transparent 48%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
     body::after {
       content: '';
       position: fixed;
       inset: 0;
       background-image: repeating-linear-gradient(
         0deg,
-        rgba(0, 0, 0, 0.05) 0px,
-        rgba(0, 0, 0, 0.05) 1px,
+        rgba(255, 255, 255, 0.18) 0px,
+        rgba(255, 255, 255, 0.18) 1px,
         transparent 1px,
         transparent 3px
       );
+      opacity: 0.34;
       pointer-events: none;
       z-index: 999;
     }
 
     .container {
       width: 100%;
-      max-width: 560px;
+      max-width: 1120px;
       display: flex;
       flex-direction: column;
-      gap: 1.75rem;
+      gap: 1.5rem;
     }
 
-    /* ── Header ─────────────────────────────────────── */
     .header {
       text-align: center;
+      position: relative;
+      padding: 0.75rem 0.75rem 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.52);
+      border-radius: 28px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 238, 246, 0.68)),
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.46), transparent 48%);
+      box-shadow:
+        0 22px 80px rgba(255, 121, 177, 0.18),
+        0 10px 30px rgba(64, 182, 193, 0.12);
+      backdrop-filter: blur(20px);
+      overflow: hidden;
+    }
+
+    .hero-scene {
+      position: relative;
+      height: 186px;
+      border-radius: 22px;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(255, 196, 224, 0.82) 0%, rgba(255, 222, 236, 0.72) 34%, rgba(166, 249, 255, 0.6) 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.6),
+        inset 0 -18px 30px rgba(103, 221, 229, 0.12);
+    }
+
+    .hero-scene::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 38%),
+        repeating-linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.14) 0 12px,
+          rgba(255, 255, 255, 0.02) 12px 24px
+        );
+      mix-blend-mode: screen;
+      opacity: 0.46;
+    }
+
+    .hero-scene::after {
+      content: '';
+      position: absolute;
+      left: -10%;
+      right: -10%;
+      bottom: 0;
+      height: 44%;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(118, 240, 246, 0.32)),
+        repeating-linear-gradient(
+          0deg,
+          rgba(255, 255, 255, 0.14) 0 2px,
+          rgba(255, 255, 255, 0) 2px 18px
+        );
+      clip-path: polygon(0 24%, 100% 0, 100% 100%, 0 100%);
+      opacity: 0.8;
+    }
+
+    .sun {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      width: 158px;
+      height: 158px;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background:
+        repeating-linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.05) 0 12px,
+          rgba(255, 255, 255, 0.2) 12px 14px
+        ),
+        linear-gradient(180deg, rgba(255, 230, 147, 0.96), rgba(255, 129, 178, 0.92) 58%, rgba(255, 103, 166, 0.96));
+      box-shadow:
+        0 0 55px rgba(255, 127, 184, 0.42),
+        0 0 110px rgba(255, 208, 124, 0.2);
+      opacity: 0.96;
+    }
+
+    .grid {
+      position: absolute;
+      left: -10%;
+      right: -10%;
+      bottom: -2px;
+      height: 54%;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.25)),
+        repeating-linear-gradient(
+          90deg,
+          rgba(255, 121, 177, 0.5) 0 2px,
+          transparent 2px 72px
+        ),
+        repeating-linear-gradient(
+          180deg,
+          rgba(255, 121, 177, 0.52) 0 2px,
+          transparent 2px 30px
+        );
+      transform: perspective(420px) rotateX(78deg);
+      transform-origin: bottom;
+      opacity: 0.68;
+    }
+
+    .title-wrap {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 1rem 1.25rem 1.35rem;
+      z-index: 2;
     }
 
     .title {
       font-family: var(--font-display);
-      font-size: 5rem;
-      line-height: 1;
-      color: var(--pink);
-      letter-spacing: 0.06em;
+      font-size: clamp(2.6rem, 5.9vw, 4.5rem);
+      line-height: 0.92;
+      color: var(--pearl);
+      letter-spacing: 0.045em;
       cursor: default;
-      animation: logoBreathe 5s ease-in-out infinite, logoGlitch 11s linear infinite;
+      text-transform: uppercase;
+      text-align: center;
+      white-space: nowrap;
+      max-width: 100%;
+      text-shadow:
+        0 6px 18px rgba(255, 120, 172, 0.35),
+        0 0 30px rgba(255, 255, 255, 0.36);
+      animation: titleFloat 7s ease-in-out infinite;
     }
 
-    @keyframes logoBreathe {
+    @keyframes titleFloat {
       0%, 100% {
+        transform: translateY(0);
         text-shadow:
-          0 0 8px  rgba(255, 45, 120, 0.9),
-          0 0 24px rgba(255, 45, 120, 0.5),
-          0 0 60px rgba(255, 45, 120, 0.2);
+          0 6px 18px rgba(255, 120, 172, 0.35),
+          0 0 30px rgba(255, 255, 255, 0.36);
       }
       50% {
+        transform: translateY(-5px);
         text-shadow:
-          0 0 14px rgba(255, 45, 120, 1),
-          0 0 40px rgba(255, 45, 120, 0.7),
-          0 0 90px rgba(255, 45, 120, 0.35),
-          0 0 140px rgba(255, 45, 120, 0.12);
-      }
-    }
-
-    @keyframes logoGlitch {
-      0%, 82%, 100% {
-        transform: none;
-        text-shadow:
-          0 0 8px  rgba(255, 45, 120, 0.9),
-          0 0 24px rgba(255, 45, 120, 0.5),
-          0 0 60px rgba(255, 45, 120, 0.2);
-      }
-      83% {
-        transform: translateX(3px) skewX(-2deg);
-        text-shadow:
-          -3px 0 rgba(0, 229, 255, 0.85),
-           3px 0 rgba(255, 45, 120, 0.85),
-           0 0 30px rgba(255, 45, 120, 0.4);
-        opacity: 0.85;
-      }
-      84% {
-        transform: translateX(-3px) skewX(2deg);
-        text-shadow:
-           3px 0 rgba(0, 229, 255, 0.85),
-          -3px 0 rgba(255, 45, 120, 0.85),
-           0 0 30px rgba(255, 45, 120, 0.4);
-        opacity: 0.9;
-      }
-      85% {
-        transform: none;
-        text-shadow:
-          0 0 8px rgba(255, 45, 120, 0.9),
-          0 0 24px rgba(255, 45, 120, 0.5),
-          0 0 60px rgba(255, 45, 120, 0.2);
-        opacity: 1;
-      }
-      86% {
-        transform: translateX(2px);
-        text-shadow:
-          -2px 0 rgba(0, 229, 255, 0.7),
-           2px 0 rgba(255, 45, 120, 0.7);
-        opacity: 0.75;
-      }
-      87% {
-        transform: none;
-        text-shadow:
-          0 0 8px rgba(255, 45, 120, 0.9),
-          0 0 24px rgba(255, 45, 120, 0.5),
-          0 0 60px rgba(255, 45, 120, 0.2);
-        opacity: 1;
+          0 10px 28px rgba(255, 120, 172, 0.42),
+          0 0 42px rgba(255, 255, 255, 0.52);
       }
     }
 
     .title:hover {
-      animation: logoGlitchHover 0.45s steps(1) forwards, logoBreathe 5s ease-in-out infinite;
-    }
-
-    @keyframes logoGlitchHover {
-      0%  { transform: translateX(4px) skewX(-3deg); text-shadow: -4px 0 var(--cyan), 4px 0 var(--pink); opacity: 0.7; }
-      20% { transform: translateX(-4px) skewX(3deg); text-shadow: 4px 0 var(--cyan), -4px 0 var(--pink); opacity: 0.85; }
-      40% { transform: translateX(2px); text-shadow: -2px 0 var(--cyan), 2px 0 var(--pink); opacity: 0.9; }
-      60% { transform: translateX(-2px) skewX(1deg); text-shadow: 2px 0 var(--purple), -2px 0 var(--pink); opacity: 0.8; }
-      80% { transform: translateX(1px); }
-      100% {
-        transform: none;
-        text-shadow: 0 0 8px rgba(255,45,120,0.9), 0 0 24px rgba(255,45,120,0.5), 0 0 60px rgba(255,45,120,0.2);
-        opacity: 1;
-      }
+      color: #ffffff;
     }
 
     .subtitle {
-      font-size: 0.65rem;
-      color: var(--cyan);
+      font-size: 0.62rem;
+      color: var(--text);
       letter-spacing: 0.22em;
       text-transform: uppercase;
-      margin-top: 0.4rem;
-      text-shadow: 0 0 10px rgba(0, 229, 255, 0.55);
+      margin-top: 0.35rem;
+      text-align: center;
+      opacity: 0.82;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
     }
 
-    .sep {
-      height: 1px;
-      background: linear-gradient(90deg,
-        transparent,
-        var(--pink),
-        var(--purple),
-        var(--cyan),
-        var(--purple),
-        var(--pink),
-        transparent
-      );
-      background-size: 300% 100%;
-      margin: 0.9rem auto 0;
-      width: 72%;
-      opacity: 0.7;
-      animation: sepFlow 4s linear infinite;
-    }
-
-    @keyframes sepFlow {
-      0%   { background-position: 0% 0; }
-      100% { background-position: 100% 0; }
-    }
-
-    /* ── Input row ──────────────────────────────────── */
     .input-row {
       display: flex;
       gap: 0.5rem;
+      width: min(100%, 560px);
+      margin-inline: auto;
+      padding: 0.55rem;
+      border: 1px solid rgba(255, 255, 255, 0.58);
+      border-radius: 24px;
+      background: rgba(255, 250, 253, 0.62);
+      box-shadow: 0 12px 32px rgba(255, 143, 137, 0.08);
+      backdrop-filter: blur(18px);
     }
 
     .query-input {
       flex: 1;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 3px;
-      padding: 0.65rem 0.9rem;
+      border-radius: 18px;
+      padding: 0.85rem 1rem;
       font-family: var(--font-body);
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       color: var(--text);
       outline: none;
       transition: border-color 0.15s, box-shadow 0.15s;
@@ -225,24 +284,26 @@
     }
 
     .query-input:focus {
-      border-color: var(--pink);
-      box-shadow: 0 0 0 1px rgba(255, 45, 120, 0.4),
-                  0 0 18px rgba(255, 45, 120, 0.25);
+      border-color: var(--pink-bright);
+      box-shadow: 0 0 0 1px rgba(255, 111, 177, 0.28),
+                  0 0 22px rgba(114, 235, 244, 0.22);
     }
 
     .submit-btn {
-      background: var(--pink);
-      color: #fff;
+      background: linear-gradient(135deg, var(--pink) 0%, var(--coral) 100%);
+      color: white;
       border: none;
-      border-radius: 3px;
-      padding: 0.65rem 1.2rem;
+      border-radius: 18px;
+      padding: 0.85rem 1.3rem;
       font-family: var(--font-body);
       font-size: 0.78rem;
       font-weight: 500;
       letter-spacing: 0.08em;
       cursor: pointer;
       transition: background 0.12s, box-shadow 0.12s;
-      box-shadow: 0 0 14px rgba(255, 45, 120, 0.45);
+      box-shadow:
+        0 14px 26px rgba(255, 111, 177, 0.18),
+        0 0 0 1px rgba(255, 255, 255, 0.18) inset;
       text-transform: uppercase;
       position: relative;
       overflow: hidden;
@@ -271,9 +332,10 @@
     }
 
     .submit-btn:hover:not(:disabled) {
-      background: var(--pink-bright);
-      box-shadow: 0 0 28px rgba(255, 45, 120, 0.8),
-                  0 0 8px  rgba(255, 45, 120, 0.5);
+      background: linear-gradient(135deg, var(--pink-bright) 0%, #ffaa86 100%);
+      box-shadow:
+        0 18px 36px rgba(255, 111, 177, 0.24),
+        0 0 24px rgba(114, 235, 244, 0.18);
     }
 
     .submit-btn:disabled {
@@ -282,19 +344,23 @@
       box-shadow: none;
     }
 
-    /* ── Result card ─────────────────────────────────── */
     .card {
-      background: var(--surface);
+      background:
+        linear-gradient(180deg, rgba(255, 248, 251, 0.88), rgba(255, 241, 248, 0.82));
       border: 1px solid var(--border);
-      border-radius: 3px;
+      border-radius: 28px;
       overflow: hidden;
+      width: min(100%, 560px);
+      margin-inline: auto;
+      box-shadow: 0 18px 48px rgba(255, 143, 137, 0.08);
+      backdrop-filter: blur(18px);
     }
 
     .card:not(.hidden) {
       border-color: var(--border-hi);
       box-shadow:
-        0 0 0 1px rgba(122, 0, 204, 0.18),
-        0 6px 32px rgba(122, 0, 204, 0.18);
+        0 0 0 1px rgba(255, 111, 177, 0.14),
+        0 24px 60px rgba(255, 143, 137, 0.14);
       animation: cardIn 0.28s ease;
       transition: border-color 0.25s, box-shadow 0.25s;
     }
@@ -302,8 +368,8 @@
     .card:not(.hidden):hover {
       border-color: var(--pink);
       box-shadow:
-        0 0 0 1px rgba(255, 45, 120, 0.2),
-        0 8px 40px rgba(255, 45, 120, 0.15);
+        0 0 0 1px rgba(255, 111, 177, 0.2),
+        0 28px 64px rgba(114, 235, 244, 0.14);
     }
 
     @keyframes cardIn {
@@ -311,22 +377,23 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* ── Metadata ────────────────────────────────────── */
     .meta {
       display: flex;
       gap: 0.75rem;
-      padding: 0.75rem 1rem;
+      padding: 0.95rem 1rem;
       border-bottom: 1px solid var(--border);
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.34), rgba(201, 251, 255, 0.18));
     }
 
     .thumb {
       width: 6.5rem;
       height: 3.65rem;
       object-fit: cover;
-      border-radius: 2px;
+      border-radius: 14px;
       flex-shrink: 0;
       background: var(--surface-2);
       transition: filter 0.2s, transform 0.2s;
+      box-shadow: 0 12px 22px rgba(255, 143, 137, 0.12);
     }
 
     .thumb:hover {
@@ -345,6 +412,7 @@
     .video-title {
       font-size: 0.78rem;
       font-weight: 500;
+      color: var(--text);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -358,12 +426,11 @@
       text-overflow: ellipsis;
     }
 
-    /* ── Status row ──────────────────────────────────── */
     .status-row {
       display: flex;
       align-items: center;
       gap: 0.6rem;
-      padding: 0.6rem 1rem;
+      padding: 0.8rem 1rem;
       border-bottom: 1px solid var(--border);
     }
 
@@ -371,11 +438,11 @@
       width: 13px;
       height: 13px;
       border: 2px solid var(--border);
-      border-top-color: var(--cyan);
+      border-top-color: var(--aqua-deep);
       border-radius: 50%;
       animation: spin 0.65s linear infinite;
       flex-shrink: 0;
-      box-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
+      box-shadow: 0 0 8px rgba(36, 205, 217, 0.3);
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -386,8 +453,8 @@
       flex-shrink: 0;
     }
 
-    .icon-ok  { color: var(--success); filter: drop-shadow(0 0 4px rgba(0, 255, 157, 0.7)); }
-    .icon-err { color: var(--error);   filter: drop-shadow(0 0 4px rgba(255, 53, 102, 0.7)); }
+    .icon-ok  { color: var(--success); filter: drop-shadow(0 0 5px rgba(38, 186, 157, 0.3)); }
+    .icon-err { color: var(--error);   filter: drop-shadow(0 0 5px rgba(217, 91, 123, 0.25)); }
 
     .status-text {
       font-size: 0.72rem;
@@ -395,18 +462,17 @@
       letter-spacing: 0.06em;
     }
 
-    /* ── Error detail ────────────────────────────────── */
     .error-detail {
       font-size: 0.68rem;
       color: var(--error);
       padding: 0.5rem 1rem;
       border-bottom: 1px solid var(--border);
       word-break: break-all;
+      background: rgba(255, 228, 236, 0.5);
     }
 
-    /* ── Audio player ────────────────────────────────── */
     .player-wrap {
-      padding: 0.75rem 1rem;
+      padding: 0.95rem 1rem 1rem;
     }
 
     audio {
@@ -414,7 +480,47 @@
       accent-color: var(--pink);
     }
 
-    /* ── Utility ─────────────────────────────────────── */
+    @media (max-width: 640px) {
+      body {
+        padding: 1rem;
+      }
+
+      .header {
+        padding: 0.65rem 0.65rem 0.9rem;
+      }
+
+      .hero-scene {
+        height: 164px;
+      }
+
+      .sun {
+        width: 126px;
+        height: 126px;
+      }
+
+      .input-row {
+        flex-direction: column;
+      }
+
+      .submit-btn {
+        width: 100%;
+      }
+
+      .title-wrap {
+        padding: 0.75rem 0.9rem 1rem;
+      }
+
+      .title {
+        font-size: clamp(2.2rem, 10.8vw, 3.35rem);
+        letter-spacing: 0.035em;
+      }
+
+      .subtitle {
+        font-size: 0.54rem;
+        letter-spacing: 0.16em;
+      }
+    }
+
     .hidden { display: none !important; }
   </style>
 </head>
@@ -424,9 +530,14 @@
 
     <!-- Header -->
     <div class="header">
-      <h1 class="title">VirtualDreams</h1>
-      <p class="subtitle">Vaporwave chorus maker</p>
-      <div class="sep"></div>
+      <div class="hero-scene" aria-hidden="true">
+        <div class="sun"></div>
+        <div class="grid"></div>
+        <div class="title-wrap">
+          <h1 class="title">VirtualDreams</h1>
+          <p class="subtitle">Vaporwave chorus maker</p>
+        </div>
+      </div>
     </div>
 
     <!-- Input -->
@@ -490,7 +601,8 @@
     const playerWrap = document.getElementById('playerWrap');
     const player     = document.getElementById('player');
 
-    let pollTimer = null;
+    let eventStream = null;
+    let playerUrl = null;
 
     function isYouTubeUrl(q) {
       return /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//.test(q.trim());
@@ -521,43 +633,59 @@
       const res = await fetch(`${API}/jobs/${jobId}/audio`);
       if (!res.ok) throw new Error(`Audio fetch failed: ${res.status}`);
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      player.src = url;
+      if (playerUrl) URL.revokeObjectURL(playerUrl);
+      playerUrl = URL.createObjectURL(blob);
+      player.src = playerUrl;
       playerWrap.classList.remove('hidden');
       player.play().catch(() => {});
     }
 
-    async function poll(jobId) {
-      const res = await fetch(`${API}/jobs/${jobId}`);
-      if (!res.ok) {
-        setStatus('error', `Polling failed (${res.status})`);
-        return;
+    function closeEventStream() {
+      if (eventStream) {
+        eventStream.close();
+        eventStream = null;
       }
-      const job = await res.json();
+    }
 
-      if (job.status === 'pending') {
-        setStatus('loading', 'Queued…');
-      } else if (job.status === 'running') {
-        setStatus('loading', 'Processing…');
-      } else if (job.status === 'completed') {
-        setStatus('ok', 'Done — loading audio…');
-        clearInterval(pollTimer);
-        try {
-          await fetchAudio(jobId);
-          setStatus('ok', 'Ready');
-        } catch (e) {
-          setStatus('error', 'Failed to load audio');
-          errorDetail.textContent = e.message;
+    function openJobEvents(jobId) {
+      closeEventStream();
+      eventStream = new EventSource(`${API}/jobs/${jobId}/events`);
+
+      eventStream.onmessage = async (event) => {
+        const job = JSON.parse(event.data);
+
+        if (job.status === 'pending') {
+          setStatus('loading', 'Queued…');
+        } else if (job.status === 'running') {
+          setStatus('loading', 'Processing…');
+        } else if (job.status === 'completed') {
+          setStatus('ok', 'Done — loading audio…');
+          closeEventStream();
+          try {
+            await fetchAudio(jobId);
+            setStatus('ok', 'Ready');
+          } catch (e) {
+            setStatus('error', 'Failed to load audio');
+            errorDetail.textContent = e.message;
+            errorDetail.classList.remove('hidden');
+          }
+          submitBtn.disabled = false;
+        } else if (job.status === 'failed') {
+          setStatus('error', 'Processing failed');
+          errorDetail.textContent = job.error || '';
           errorDetail.classList.remove('hidden');
+          closeEventStream();
+          submitBtn.disabled = false;
         }
-        submitBtn.disabled = false;
-      } else if (job.status === 'failed') {
-        setStatus('error', 'Processing failed');
-        errorDetail.textContent = job.error || '';
+      };
+
+      eventStream.onerror = () => {
+        setStatus('error', 'Event stream disconnected');
+        errorDetail.textContent = 'Lost connection to job status updates';
         errorDetail.classList.remove('hidden');
-        clearInterval(pollTimer);
+        closeEventStream();
         submitBtn.disabled = false;
-      }
+      };
     }
 
     async function submit() {
@@ -565,12 +693,17 @@
       if (!query) return;
 
       // reset
-      clearInterval(pollTimer);
+      closeEventStream();
       submitBtn.disabled = true;
       card.classList.remove('hidden');
       metaEl.classList.add('hidden');
       errorDetail.classList.add('hidden');
       playerWrap.classList.add('hidden');
+      errorDetail.textContent = '';
+      if (playerUrl) {
+        URL.revokeObjectURL(playerUrl);
+        playerUrl = null;
+      }
       player.src = '';
       setStatus('loading', 'Submitting…');
 
@@ -586,12 +719,12 @@
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         const { job_id } = await res.json();
         setStatus('loading', 'Queued…');
-        poll(job_id);
-        pollTimer = setInterval(() => poll(job_id), 3000);
+        openJobEvents(job_id);
       } catch (e) {
         setStatus('error', 'Failed to submit job');
         errorDetail.textContent = e.message;
         errorDetail.classList.remove('hidden');
+        closeEventStream();
         submitBtn.disabled = false;
       }
     }
