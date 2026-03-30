@@ -26,12 +26,13 @@ COPY --from=rust-builder /build/target/release/chorus-detector /usr/local/bin/ch
 
 WORKDIR /app
 
-# Install Python deps (production only, no dev extras)
+# Install Python dependencies first (layer cache: only re-runs when lock file changes)
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --no-install-project
 
-# Copy application source
+# Copy source and install the project itself
 COPY src/ ./src/
+RUN uv sync --frozen --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV CHORUS_DETECTOR_BIN=/usr/local/bin/chorus-detector
