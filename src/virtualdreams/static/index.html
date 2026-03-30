@@ -4,60 +4,468 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VirtualDreams</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col items-center justify-center p-6">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  <div class="w-full max-w-xl flex flex-col gap-6">
+    :root {
+      --bg:           #060010;
+      --surface:      #0c0020;
+      --surface-2:    #130030;
+      --border:       #280050;
+      --border-hi:    #7a00cc;
+      --pink:         #ff2d78;
+      --pink-bright:  #ff5499;
+      --cyan:         #00e5ff;
+      --purple:       #bf5fff;
+      --text:         #f0e0ff;
+      --text-muted:   #7a5a9a;
+      --success:      #00ff9d;
+      --error:        #ff3566;
+      --font-display: 'VT323', monospace;
+      --font-body:    'IBM Plex Mono', monospace;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--bg);
+      background-image:
+        linear-gradient(rgba(191, 95, 255, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(191, 95, 255, 0.045) 1px, transparent 1px);
+      background-size: 48px 48px;
+      color: var(--text);
+      min-height: 100svh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    /* Scanline overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.05) 0px,
+        rgba(0, 0, 0, 0.05) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.75rem;
+    }
+
+    /* ── Header ─────────────────────────────────────── */
+    .header {
+      text-align: center;
+    }
+
+    .title {
+      font-family: var(--font-display);
+      font-size: 5rem;
+      line-height: 1;
+      color: var(--pink);
+      letter-spacing: 0.06em;
+      cursor: default;
+      animation: logoBreathe 5s ease-in-out infinite, logoGlitch 11s linear infinite;
+    }
+
+    @keyframes logoBreathe {
+      0%, 100% {
+        text-shadow:
+          0 0 8px  rgba(255, 45, 120, 0.9),
+          0 0 24px rgba(255, 45, 120, 0.5),
+          0 0 60px rgba(255, 45, 120, 0.2);
+      }
+      50% {
+        text-shadow:
+          0 0 14px rgba(255, 45, 120, 1),
+          0 0 40px rgba(255, 45, 120, 0.7),
+          0 0 90px rgba(255, 45, 120, 0.35),
+          0 0 140px rgba(255, 45, 120, 0.12);
+      }
+    }
+
+    @keyframes logoGlitch {
+      0%, 82%, 100% {
+        transform: none;
+        text-shadow:
+          0 0 8px  rgba(255, 45, 120, 0.9),
+          0 0 24px rgba(255, 45, 120, 0.5),
+          0 0 60px rgba(255, 45, 120, 0.2);
+      }
+      83% {
+        transform: translateX(3px) skewX(-2deg);
+        text-shadow:
+          -3px 0 rgba(0, 229, 255, 0.85),
+           3px 0 rgba(255, 45, 120, 0.85),
+           0 0 30px rgba(255, 45, 120, 0.4);
+        opacity: 0.85;
+      }
+      84% {
+        transform: translateX(-3px) skewX(2deg);
+        text-shadow:
+           3px 0 rgba(0, 229, 255, 0.85),
+          -3px 0 rgba(255, 45, 120, 0.85),
+           0 0 30px rgba(255, 45, 120, 0.4);
+        opacity: 0.9;
+      }
+      85% {
+        transform: none;
+        text-shadow:
+          0 0 8px rgba(255, 45, 120, 0.9),
+          0 0 24px rgba(255, 45, 120, 0.5),
+          0 0 60px rgba(255, 45, 120, 0.2);
+        opacity: 1;
+      }
+      86% {
+        transform: translateX(2px);
+        text-shadow:
+          -2px 0 rgba(0, 229, 255, 0.7),
+           2px 0 rgba(255, 45, 120, 0.7);
+        opacity: 0.75;
+      }
+      87% {
+        transform: none;
+        text-shadow:
+          0 0 8px rgba(255, 45, 120, 0.9),
+          0 0 24px rgba(255, 45, 120, 0.5),
+          0 0 60px rgba(255, 45, 120, 0.2);
+        opacity: 1;
+      }
+    }
+
+    .title:hover {
+      animation: logoGlitchHover 0.45s steps(1) forwards, logoBreathe 5s ease-in-out infinite;
+    }
+
+    @keyframes logoGlitchHover {
+      0%  { transform: translateX(4px) skewX(-3deg); text-shadow: -4px 0 var(--cyan), 4px 0 var(--pink); opacity: 0.7; }
+      20% { transform: translateX(-4px) skewX(3deg); text-shadow: 4px 0 var(--cyan), -4px 0 var(--pink); opacity: 0.85; }
+      40% { transform: translateX(2px); text-shadow: -2px 0 var(--cyan), 2px 0 var(--pink); opacity: 0.9; }
+      60% { transform: translateX(-2px) skewX(1deg); text-shadow: 2px 0 var(--purple), -2px 0 var(--pink); opacity: 0.8; }
+      80% { transform: translateX(1px); }
+      100% {
+        transform: none;
+        text-shadow: 0 0 8px rgba(255,45,120,0.9), 0 0 24px rgba(255,45,120,0.5), 0 0 60px rgba(255,45,120,0.2);
+        opacity: 1;
+      }
+    }
+
+    .subtitle {
+      font-size: 0.65rem;
+      color: var(--cyan);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      margin-top: 0.4rem;
+      text-shadow: 0 0 10px rgba(0, 229, 255, 0.55);
+    }
+
+    .sep {
+      height: 1px;
+      background: linear-gradient(90deg,
+        transparent,
+        var(--pink),
+        var(--purple),
+        var(--cyan),
+        var(--purple),
+        var(--pink),
+        transparent
+      );
+      background-size: 300% 100%;
+      margin: 0.9rem auto 0;
+      width: 72%;
+      opacity: 0.7;
+      animation: sepFlow 4s linear infinite;
+    }
+
+    @keyframes sepFlow {
+      0%   { background-position: 0% 0; }
+      100% { background-position: 100% 0; }
+    }
+
+    /* ── Input row ──────────────────────────────────── */
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .query-input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 0.65rem 0.9rem;
+      font-family: var(--font-body);
+      font-size: 0.78rem;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .query-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .query-input:hover:not(:focus) {
+      border-color: var(--border-hi);
+    }
+
+    .query-input:focus {
+      border-color: var(--pink);
+      box-shadow: 0 0 0 1px rgba(255, 45, 120, 0.4),
+                  0 0 18px rgba(255, 45, 120, 0.25);
+    }
+
+    .submit-btn {
+      background: var(--pink);
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      padding: 0.65rem 1.2rem;
+      font-family: var(--font-body);
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: background 0.12s, box-shadow 0.12s;
+      box-shadow: 0 0 14px rgba(255, 45, 120, 0.45);
+      text-transform: uppercase;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .submit-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(105deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.22) 50%,
+        transparent 70%
+      );
+      transform: translateX(-100%);
+      transition: none;
+    }
+
+    .submit-btn:hover:not(:disabled)::before {
+      animation: btnShimmer 0.45s ease forwards;
+    }
+
+    @keyframes btnShimmer {
+      from { transform: translateX(-100%); }
+      to   { transform: translateX(100%); }
+    }
+
+    .submit-btn:hover:not(:disabled) {
+      background: var(--pink-bright);
+      box-shadow: 0 0 28px rgba(255, 45, 120, 0.8),
+                  0 0 8px  rgba(255, 45, 120, 0.5);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* ── Result card ─────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .card:not(.hidden) {
+      border-color: var(--border-hi);
+      box-shadow:
+        0 0 0 1px rgba(122, 0, 204, 0.18),
+        0 6px 32px rgba(122, 0, 204, 0.18);
+      animation: cardIn 0.28s ease;
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+
+    .card:not(.hidden):hover {
+      border-color: var(--pink);
+      box-shadow:
+        0 0 0 1px rgba(255, 45, 120, 0.2),
+        0 8px 40px rgba(255, 45, 120, 0.15);
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Metadata ────────────────────────────────────── */
+    .meta {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .thumb {
+      width: 6.5rem;
+      height: 3.65rem;
+      object-fit: cover;
+      border-radius: 2px;
+      flex-shrink: 0;
+      background: var(--surface-2);
+      transition: filter 0.2s, transform 0.2s;
+    }
+
+    .thumb:hover {
+      filter: saturate(1.4) brightness(1.1);
+      transform: scale(1.04);
+    }
+
+    .meta-text {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 0.3rem;
+      min-width: 0;
+    }
+
+    .video-title {
+      font-size: 0.78rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .video-author {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── Status row ──────────────────────────────────── */
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .spinner {
+      width: 13px;
+      height: 13px;
+      border: 2px solid var(--border);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+      flex-shrink: 0;
+      box-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .icon-ok, .icon-err {
+      width: 13px;
+      height: 13px;
+      flex-shrink: 0;
+    }
+
+    .icon-ok  { color: var(--success); filter: drop-shadow(0 0 4px rgba(0, 255, 157, 0.7)); }
+    .icon-err { color: var(--error);   filter: drop-shadow(0 0 4px rgba(255, 53, 102, 0.7)); }
+
+    .status-text {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Error detail ────────────────────────────────── */
+    .error-detail {
+      font-size: 0.68rem;
+      color: var(--error);
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid var(--border);
+      word-break: break-all;
+    }
+
+    /* ── Audio player ────────────────────────────────── */
+    .player-wrap {
+      padding: 0.75rem 1rem;
+    }
+
+    audio {
+      width: 100%;
+      accent-color: var(--pink);
+    }
+
+    /* ── Utility ─────────────────────────────────────── */
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
 
     <!-- Header -->
-    <div class="text-center">
-      <h1 class="text-3xl font-bold tracking-tight">VirtualDreams</h1>
-      <p class="text-zinc-400 text-sm mt-1">YouTube → vaporwave chorus extractor</p>
+    <div class="header">
+      <h1 class="title">VirtualDreams</h1>
+      <p class="subtitle">Vaporwave chorus maker</p>
+      <div class="sep"></div>
     </div>
 
     <!-- Input -->
-    <div class="flex gap-2">
+    <div class="input-row">
       <input
         id="query"
         type="text"
-        placeholder="YouTube URL or search query…"
-        class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
+        placeholder="Paste a YouTube URL…"
+        class="query-input"
       />
-      <button
-        id="submitBtn"
-        class="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg px-5 py-2.5 text-sm font-medium"
-      >
-        Process
-      </button>
+      <button id="submitBtn" class="submit-btn">Process</button>
     </div>
 
     <!-- Status / result card — hidden initially -->
-    <div id="card" class="hidden bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+    <div id="card" class="card hidden">
 
       <!-- Video metadata -->
-      <div id="meta" class="hidden flex gap-4 p-4 border-b border-zinc-800">
-        <img id="thumb" src="" alt="thumbnail" class="w-28 h-16 object-cover rounded-md flex-shrink-0 bg-zinc-800" />
-        <div class="flex flex-col justify-center gap-1 min-w-0">
-          <p id="videoTitle" class="text-sm font-medium truncate"></p>
-          <p id="videoAuthor" class="text-xs text-zinc-400 truncate"></p>
+      <div id="meta" class="meta hidden">
+        <img id="thumb" src="" alt="thumbnail" class="thumb" />
+        <div class="meta-text">
+          <p id="videoTitle" class="video-title"></p>
+          <p id="videoAuthor" class="video-author"></p>
         </div>
       </div>
 
       <!-- Status row -->
-      <div class="flex items-center gap-3 px-4 py-3 border-b border-zinc-800">
-        <div id="spinner" class="hidden w-4 h-4 border-2 border-zinc-600 border-t-violet-400 rounded-full animate-spin"></div>
-        <svg id="iconOk" class="hidden w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-        <svg id="iconErr" class="hidden w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        <span id="statusText" class="text-sm text-zinc-300"></span>
+      <div class="status-row">
+        <div id="spinner" class="spinner hidden"></div>
+        <svg id="iconOk" class="icon-ok hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        <svg id="iconErr" class="icon-err hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        <span id="statusText" class="status-text"></span>
       </div>
 
       <!-- Error detail -->
-      <p id="errorDetail" class="hidden text-xs text-red-400 px-4 py-2 border-b border-zinc-800 font-mono break-all"></p>
+      <p id="errorDetail" class="error-detail hidden"></p>
 
       <!-- Audio player -->
-      <div id="playerWrap" class="hidden p-4">
-        <audio id="player" controls class="w-full accent-violet-500"></audio>
+      <div id="playerWrap" class="player-wrap hidden">
+        <audio id="player" controls></audio>
       </div>
 
     </div>
@@ -106,7 +514,6 @@
         videoTitle.textContent = data.title || '';
         videoAuthor.textContent = data.author_name || '';
         metaEl.classList.remove('hidden');
-        metaEl.classList.add('flex');
       } catch (_) { /* metadata is best-effort */ }
     }
 
@@ -162,7 +569,6 @@
       submitBtn.disabled = true;
       card.classList.remove('hidden');
       metaEl.classList.add('hidden');
-      metaEl.classList.remove('flex');
       errorDetail.classList.add('hidden');
       playerWrap.classList.add('hidden');
       player.src = '';
