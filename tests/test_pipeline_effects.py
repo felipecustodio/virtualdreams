@@ -53,7 +53,7 @@ async def test_effects_raises_on_failure(tmp_path):
             await apply_vaporwave(input_wav, output_wav)
 
 
-async def test_effects_uses_asetrate_not_atempo(tmp_path):
+async def test_effects_matches_legacy_vaporwave_profile(tmp_path):
     input_wav = tmp_path / "chorus.wav"
     output_wav = tmp_path / "vapor.wav"
     input_wav.write_bytes(b"RIFF")
@@ -74,7 +74,9 @@ async def test_effects_uses_asetrate_not_atempo(tmp_path):
         await apply_vaporwave(input_wav, output_wav)
 
     cmd = " ".join(str(a) for a in captured)
-    assert "asetrate" in cmd
+    assert "asetrate=27783" in cmd
     assert "aresample" in cmd
     assert "aecho" in cmd
+    assert "60|120|180|260" in cmd
+    assert "0.32|0.24|0.18|0.12" in cmd
     assert "atempo" not in cmd
