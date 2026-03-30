@@ -1,11 +1,12 @@
 cache/
 backup/
 *.log
-*.env
+.env
 *.wav
 *.mp3
-*.bundle
 __pycache__/
 *.pyc
 *.pyo
+.venv/
 .worktrees/
+chorus-detector/target/
