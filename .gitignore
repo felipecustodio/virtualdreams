@@ -1,12 +1,47 @@
-cache/
-backup/
-*.log
-.env
-*.wav
-*.mp3
+# ── Dependencies & build ─────────────────────────────────────────────────────
+.venv/
+chorus-detector/target/
 __pycache__/
 *.pyc
 *.pyo
-.venv/
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# ── Environment & secrets ─────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Audio / temp output ───────────────────────────────────────────────────────
+*.wav
+*.mp3
+cache/
+backup/
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+
+# ── Testing & tooling caches ──────────────────────────────────────────────────
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ty_cache/
+
+# ── Editor & IDE ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Git worktrees ─────────────────────────────────────────────────────────────
 .worktrees/
-chorus-detector/target/
+
+# ── Tool state ────────────────────────────────────────────────────────────────
+.serena/
