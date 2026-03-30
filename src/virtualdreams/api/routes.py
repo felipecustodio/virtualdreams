@@ -14,6 +14,11 @@ class CreateJobRequest(BaseModel):
     query: str
 
 
+@router.get("/healthz")
+async def healthz() -> dict:
+    return {"status": "ok"}
+
+
 @router.post("/jobs", status_code=202)
 async def create_job(body: CreateJobRequest, request: Request) -> dict:
     job = request.app.state.job_manager.create_job(body.query)

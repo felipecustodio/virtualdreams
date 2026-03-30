@@ -41,6 +41,13 @@ async def test_get_job_not_found(client):
     assert resp.status_code == 404
 
 
+async def test_healthz(client):
+    resp = await client.get("/healthz")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
+
+
 async def test_job_events_stream_completed_status(client):
     with patch("virtualdreams.jobs.manager.JobManager._run_pipeline", new=AsyncMock()):
         create = await client.post("/jobs", json={"query": "lofi chill"})
@@ -110,6 +117,10 @@ async def test_index_uses_smooth_separator_animation(client):
     assert "title-wrap" in resp.text
     assert "Vaporwave chorus maker" in resp.text
     assert "Cormorant+Garamond" in resp.text
+    assert "unpkg.com/lucide@latest/dist/umd/lucide.js" in resp.text
+    assert 'data-lucide="sparkles"' in resp.text
+    assert "https://github.com/felipecustodio/virtualdreams/" in resp.text
+    assert 'aria-label="View project on GitHub"' in resp.text
     assert "max-width: 1120px" in resp.text
     assert "width: min(100%, 560px)" in resp.text
     assert "inset: 0;" in resp.text
