@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VirtualDreams</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col items-center justify-center p-6">
+
+  <div class="w-full max-w-xl flex flex-col gap-6">
+
+    <!-- Header -->
+    <div class="text-center">
+      <h1 class="text-3xl font-bold tracking-tight">VirtualDreams</h1>
+      <p class="text-zinc-400 text-sm mt-1">YouTube → vaporwave chorus extractor</p>
+    </div>
+
+    <!-- Input -->
+    <div class="flex gap-2">
+      <input
+        id="query"
+        type="text"
+        placeholder="YouTube URL or search query…"
+        class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
+      />
+      <button
+        id="submitBtn"
+        class="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg px-5 py-2.5 text-sm font-medium"
+      >
+        Process
+      </button>
+    </div>
+
+    <!-- Status / result card — hidden initially -->
+    <div id="card" class="hidden bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+
+      <!-- Video metadata -->
+      <div id="meta" class="hidden flex gap-4 p-4 border-b border-zinc-800">
+        <img id="thumb" src="" alt="thumbnail" class="w-28 h-16 object-cover rounded-md flex-shrink-0 bg-zinc-800" />
+        <div class="flex flex-col justify-center gap-1 min-w-0">
+          <p id="videoTitle" class="text-sm font-medium truncate"></p>
+          <p id="videoAuthor" class="text-xs text-zinc-400 truncate"></p>
+        </div>
+      </div>
+
+      <!-- Status row -->
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-zinc-800">
+        <div id="spinner" class="hidden w-4 h-4 border-2 border-zinc-600 border-t-violet-400 rounded-full animate-spin"></div>
+        <svg id="iconOk" class="hidden w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        <svg id="iconErr" class="hidden w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        <span id="statusText" class="text-sm text-zinc-300"></span>
+      </div>
+
+      <!-- Error detail -->
+      <p id="errorDetail" class="hidden text-xs text-red-400 px-4 py-2 border-b border-zinc-800 font-mono break-all"></p>
+
+      <!-- Audio player -->
+      <div id="playerWrap" class="hidden p-4">
+        <audio id="player" controls class="w-full accent-violet-500"></audio>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    const API = '';  // same origin
+
+    const queryEl    = document.getElementById('query');
+    const submitBtn  = document.getElementById('submitBtn');
+    const card       = document.getElementById('card');
+    const metaEl     = document.getElementById('meta');
+    const thumb      = document.getElementById('thumb');
+    const videoTitle = document.getElementById('videoTitle');
+    const videoAuthor= document.getElementById('videoAuthor');
+    const spinner    = document.getElementById('spinner');
+    const iconOk     = document.getElementById('iconOk');
+    const iconErr    = document.getElementById('iconErr');
+    const statusText = document.getElementById('statusText');
+    const errorDetail= document.getElementById('errorDetail');
+    const playerWrap = document.getElementById('playerWrap');
+    const player     = document.getElementById('player');
+
+    let pollTimer = null;
+
+    function isYouTubeUrl(q) {
+      return /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//.test(q.trim());
+    }
+
+    function setStatus(state, text) {
+      spinner.classList.toggle('hidden', state !== 'loading');
+      iconOk.classList.toggle('hidden', state !== 'ok');
+      iconErr.classList.toggle('hidden', state !== 'error');
+      statusText.textContent = text;
+    }
+
+    async function fetchMeta(url) {
+      try {
+        const res = await fetch(
+          `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        thumb.src = data.thumbnail_url || '';
+        videoTitle.textContent = data.title || '';
+        videoAuthor.textContent = data.author_name || '';
+        metaEl.classList.remove('hidden');
+        metaEl.classList.add('flex');
+      } catch (_) { /* metadata is best-effort */ }
+    }
+
+    async function fetchAudio(jobId) {
+      const res = await fetch(`${API}/jobs/${jobId}/audio`);
+      if (!res.ok) throw new Error(`Audio fetch failed: ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      player.src = url;
+      playerWrap.classList.remove('hidden');
+      player.play().catch(() => {});
+    }
+
+    async function poll(jobId) {
+      const res = await fetch(`${API}/jobs/${jobId}`);
+      if (!res.ok) {
+        setStatus('error', `Polling failed (${res.status})`);
+        return;
+      }
+      const job = await res.json();
+
+      if (job.status === 'pending') {
+        setStatus('loading', 'Queued…');
+      } else if (job.status === 'running') {
+        setStatus('loading', 'Processing…');
+      } else if (job.status === 'completed') {
+        setStatus('ok', 'Done — loading audio…');
+        clearInterval(pollTimer);
+        try {
+          await fetchAudio(jobId);
+          setStatus('ok', 'Ready');
+        } catch (e) {
+          setStatus('error', 'Failed to load audio');
+          errorDetail.textContent = e.message;
+          errorDetail.classList.remove('hidden');
+        }
+        submitBtn.disabled = false;
+      } else if (job.status === 'failed') {
+        setStatus('error', 'Processing failed');
+        errorDetail.textContent = job.error || '';
+        errorDetail.classList.remove('hidden');
+        clearInterval(pollTimer);
+        submitBtn.disabled = false;
+      }
+    }
+
+    async function submit() {
+      const query = queryEl.value.trim();
+      if (!query) return;
+
+      // reset
+      clearInterval(pollTimer);
+      submitBtn.disabled = true;
+      card.classList.remove('hidden');
+      metaEl.classList.add('hidden');
+      metaEl.classList.remove('flex');
+      errorDetail.classList.add('hidden');
+      playerWrap.classList.add('hidden');
+      player.src = '';
+      setStatus('loading', 'Submitting…');
+
+      // fetch metadata early if it's a URL
+      if (isYouTubeUrl(query)) fetchMeta(query);
+
+      try {
+        const res = await fetch(`${API}/jobs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query }),
+        });
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const { job_id } = await res.json();
+        setStatus('loading', 'Queued…');
+        poll(job_id);
+        pollTimer = setInterval(() => poll(job_id), 3000);
+      } catch (e) {
+        setStatus('error', 'Failed to submit job');
+        errorDetail.textContent = e.message;
+        errorDetail.classList.remove('hidden');
+        submitBtn.disabled = false;
+      }
+    }
+
+    submitBtn.addEventListener('click', submit);
+    queryEl.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  </script>
+
+</body>
+</html>

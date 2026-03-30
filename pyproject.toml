@@ -6,6 +6,7 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "python-dotenv>=1.0",
+    "aiofiles>=25.1.0",
 ]
 
 [project.optional-dependencies]
