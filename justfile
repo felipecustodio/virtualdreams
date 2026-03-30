@@ -86,6 +86,26 @@ smoke-test-binary:
     @echo "Output: /tmp/vd_test_output.wav"
     python3 -c "import os; size=os.path.getsize('/tmp/vd_test_output.wav'); expected=15*22050*4; print('File size: %d bytes (expected ~%d)' % (size,expected)); print('OK' if abs(size-expected)<500 else 'Unexpected size')"
 
+# ── Docker ───────────────────────────────────────────────────────────────────
+
+# Build the Docker image
+docker-build:
+    docker build -t virtualdreams .
+
+# Run the container (PORT env var respected, default 8000)
+docker-run:
+    docker run --rm -p "${PORT:-8000}:8000" virtualdreams
+
+# Start with docker compose (build if needed)
+docker-up:
+    docker compose up --build
+
+# Stop docker compose
+docker-down:
+    docker compose down
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+
 # Remove compiled artifacts and caches
 clean:
     cargo clean --manifest-path chorus-detector/Cargo.toml
