@@ -7,7 +7,7 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     "python-dotenv>=1.0",
     "aiofiles>=25.1.0",
-    "python-multipart>=0.0.22",
+    "python-multipart>=0.0.26",
 ]
 
 [project.optional-dependencies]
