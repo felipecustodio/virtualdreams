@@ -8,6 +8,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "aiofiles>=25.1.0",
     "python-multipart>=0.0.31",
+    "anyio>=4.14.2",
 ]
 
 [project.optional-dependencies]
